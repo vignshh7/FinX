@@ -86,6 +86,15 @@ class FintechColors {
   static const Color lightTextPrimary = Color(0xFF1F2937);
   static const Color lightTextSecondary = Color(0xFF6B7280);
   
+  // Aliases for compatibility
+  static const Color darkBackground = primaryBackground;
+  static const Color darkSurface = cardBackground;
+  static const Color darkText = textPrimary;
+  static const Color lightText = lightTextPrimary;
+  static const Color primaryColor = primaryBlue;
+  static const Color secondaryColor = primaryPurple;
+  static const Color textTertiary = textMuted;
+  
   // Helper method to get category color
   static Color getCategoryColor(String category) {
     switch (category.toLowerCase()) {

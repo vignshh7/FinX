@@ -69,7 +69,7 @@ cp .env.example .env
 python run.py
 ```
 
-The API will be available at: `http://localhost:5000`
+The API will be available at: `https://finx-ugs5.onrender.com`
 
 ## API Endpoints
 
@@ -237,7 +237,7 @@ backend/
 ### Test OCR Endpoint
 
 ```bash
-curl -X POST http://localhost:5000/api/upload-receipt \
+curl -X POST https://finx-ugs5.onrender.com/api/upload-receipt \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -F "receipt=@receipt.jpg"
 ```
@@ -245,7 +245,7 @@ curl -X POST http://localhost:5000/api/upload-receipt \
 ### Test Registration
 
 ```bash
-curl -X POST http://localhost:5000/api/register \
+curl -X POST https://finx-ugs5.onrender.com/api/register \
   -H "Content-Type: application/json" \
   -d '{"name":"Test User","email":"test@test.com","password":"password123"}'
 ```
