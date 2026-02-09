@@ -210,18 +210,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: themeProvider.isDarkMode
-                          ? const Color(0xFF3B82F6).withOpacity(0.1)
-                          : const Color(0xFFFBBF24).withOpacity(0.1),
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
                       themeProvider.isDarkMode
                           ? Icons.dark_mode
                           : Icons.light_mode,
-                      color: themeProvider.isDarkMode
-                          ? const Color(0xFF3B82F6)
-                          : const Color(0xFFFBBF24),
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                   title: const Text(
@@ -232,17 +228,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     themeProvider.isDarkMode
                         ? 'Dark theme enabled'
                         : 'Light theme enabled',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
                   ),
                   trailing: Switch(
                     value: themeProvider.isDarkMode,
                     onChanged: (value) {
                       themeProvider.toggleTheme();
                     },
-                    activeColor: const Color(0xFF3B82F6),
                   ),
                 ),
                 const Divider(height: 1),
