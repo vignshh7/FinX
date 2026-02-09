@@ -6,14 +6,17 @@ import '../../core/theme/fintech_colors.dart';
 import '../../core/theme/fintech_typography.dart';
 import '../../core/widgets/fintech_components.dart';
 import '../../providers/expense_provider.dart';
+import '../../providers/income_provider.dart';
+import '../../providers/subscription_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../models/expense_model.dart';
 import '../../models/category_model.dart';
 import '../modern_receipt_scanner_screen.dart';
-import '../expense_history_screen.dart';
-import '../modern_ai_insights_screen.dart';
-import '../subscription_tracker_screen.dart';
-import '../income_tracking_screen.dart';
+import '../expense_history_screen_new.dart';
+import '../modern_ai_insights_screen_new.dart';
+import '../subscription_tracker_screen_new.dart';
+import '../income_tracking_screen_new.dart';
 import '../settings_screen.dart';
 
 class ModernDashboardScreen extends StatefulWidget {
@@ -35,10 +38,17 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
 
   Future<void> _loadDashboardData() async {
     final expenseProvider = Provider.of<ExpenseProvider>(context, listen: false);
+    final incomeProvider = Provider.of<IncomeProvider>(context, listen: false);
+    final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+    
     try {
-      await expenseProvider.fetchExpenses();
-      await expenseProvider.fetchPrediction();
-      await expenseProvider.fetchAlerts();
+      await Future.wait([
+        expenseProvider.fetchExpenses(),
+        incomeProvider.fetchIncomes(),
+        subscriptionProvider.fetchSubscriptions(),
+        expenseProvider.fetchPrediction(),
+        expenseProvider.fetchAlerts(),
+      ]);
     } catch (e) {
       // Handle error silently for now
     }
@@ -51,6 +61,9 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final expenseProvider = Provider.of<ExpenseProvider>(context);
+    final incomeProvider = Provider.of<IncomeProvider>(context);
+    final subscriptionProvider = Provider.of<SubscriptionProvider>(context);
+    final themeProvider = Provider.of<ThemeProvider>(context);
 
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
@@ -62,104 +75,122 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
     final textPrimary = cs.onBackground;
     final textSecondary = cs.onBackground.withOpacity(0.7);
     final iconColor = theme.iconTheme.color;
-    final currencyFormat = NumberFormat.currency(symbol: '\$');
+    final currencyFormat = NumberFormat.currency(symbol: themeProvider.currencySymbol);
     final greeting = _getGreeting();
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     return Scaffold(
-      resizeToAvoidBottomInset: true,
       body: SafeArea(
+        bottom: false,
         child: RefreshIndicator(
           onRefresh: _loadDashboardData,
           color: cs.primary,
           backgroundColor: surface,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              // Modern App Bar
+              SliverToBoxAdapter(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        background,
+                        isDark ? surface : surfaceVariant,
+                      ],
+                    ),
                   ),
-                  child: IntrinsicHeight(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Modern App Bar
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                background,
-                                isDark ? surface : surfaceVariant,
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  greeting,
+                                  style: FintechTypography.bodyLarge.copyWith(
+                                    color: textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  authProvider.user?.name ?? 'User',
+                                  style: FintechTypography.h3.copyWith(
+                                    color: textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
-                          padding: EdgeInsets.fromLTRB(20, 60, 20, 20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.end,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                greeting,
-                                style: FintechTypography.bodyLarge.copyWith(
-                                  color: textSecondary,
-                                ),
+                              IconButton(
+                                icon: Icon(Icons.notifications_outlined, color: iconColor),
+                                onPressed: () => _showNotifications(context),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                authProvider.user?.name ?? 'User',
-                                style: FintechTypography.h3.copyWith(
-                                  color: textPrimary,
-                                  fontWeight: FontWeight.w700,
+                              IconButton(
+                                icon: Icon(Icons.person_outline, color: iconColor),
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                        // Action buttons
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            IconButton(
-                              icon: Icon(Icons.notifications_outlined, color: iconColor),
-                              onPressed: () => _showNotifications(context),
-                            ),
-                            IconButton(
-                              icon: Icon(Icons.person_outline, color: iconColor),
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                              ),
-                            ),
-                          ],
-                        ),
-                        // Main Content
-                        Expanded(
-                          child: _isLoading
-                              ? _buildLoadingSkeleton()
-                              : _buildDashboardContent(expenseProvider, currencyFormat),
-                        ),
-                        SizedBox(height: bottomPadding + 16),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              );
-            },
+              ),
+              // Main Content
+              _isLoading
+                  ? SliverFillRemaining(
+                      child: _buildLoadingSkeleton(),
+                    )
+                  : SliverToBoxAdapter(
+                      child: _buildDashboardContent(
+                        expenseProvider,
+                        incomeProvider,
+                        subscriptionProvider,
+                        currencyFormat,
+                      ),
+                    ),
+              // Bottom padding for navigation bar
+              SliverPadding(
+                padding: EdgeInsets.only(bottom: bottomPadding + 120),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildDashboardContent(ExpenseProvider expenseProvider, NumberFormat currencyFormat) {
+  Widget _buildDashboardContent(
+    ExpenseProvider expenseProvider,
+    IncomeProvider incomeProvider,
+    SubscriptionProvider subscriptionProvider,
+    NumberFormat currencyFormat,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Financial Overview Cards
-        _buildFinancialOverview(expenseProvider, currencyFormat),
+        _buildFinancialOverview(
+          expenseProvider,
+          incomeProvider,
+          subscriptionProvider,
+          currencyFormat,
+        ),
         
         const SizedBox(height: 24),
         
@@ -189,16 +220,26 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
         const SectionHeader(title: 'Utilities'),
         _buildUtilitiesSection(),
         
-        const SizedBox(height: 100), // Bottom padding for navigation
+        const SizedBox(height: 40),
       ],
     );
   }
 
-  Widget _buildFinancialOverview(ExpenseProvider expenseProvider, NumberFormat currencyFormat) {
+  Widget _buildFinancialOverview(
+    ExpenseProvider expenseProvider,
+    IncomeProvider incomeProvider,
+    SubscriptionProvider subscriptionProvider,
+    NumberFormat currencyFormat,
+  ) {
     final monthlySpent = expenseProvider.monthlyTotal;
-    final budget = 5000.0; // This should come from user preferences
-    final remaining = budget - monthlySpent;
-    final spentPercentage = (monthlySpent / budget).clamp(0.0, 1.0);
+    final monthlyIncome = incomeProvider.monthlyTotal;
+    final subscriptionCost = subscriptionProvider.totalMonthlyCost;
+    
+    // Calculate budget based on income or use default
+    final budget = monthlyIncome > 0 ? monthlyIncome : 5000.0;
+    final remaining = monthlyIncome - monthlySpent - subscriptionCost;
+    final spentPercentage = budget > 0 ? (monthlySpent / budget).clamp(0.0, 1.0) : 0.0;
+    final netSavings = monthlyIncome - monthlySpent;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -235,7 +276,7 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'of ${currencyFormat.format(budget)} budget',
+                  'of ${currencyFormat.format(budget)} ${monthlyIncome > 0 ? "income" : "budget"}',
                   style: FintechTypography.bodyMedium.copyWith(
                     color: Colors.white.withOpacity(0.8),
                   ),
@@ -261,10 +302,10 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
             children: [
               Expanded(
                 child: StatsCard(
-                  title: 'Remaining',
-                  value: currencyFormat.format(remaining),
-                  icon: Icons.account_balance_wallet_outlined,
-                  valueColor: remaining >= 0 ? FintechColors.successColor : FintechColors.errorColor,
+                  title: 'Net Savings',
+                  value: currencyFormat.format(netSavings),
+                  icon: Icons.savings_outlined,
+                  valueColor: netSavings >= 0 ? FintechColors.successColor : FintechColors.errorColor,
                   iconColor: FintechColors.successColor,
                 ),
               ),
@@ -272,11 +313,36 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
               Expanded(
                 child: StatsCard(
                   title: 'Income',
-                  value: currencyFormat.format(8000), // Mock data
+                  value: currencyFormat.format(monthlyIncome),
                   icon: Icons.trending_up,
                   iconColor: FintechColors.accentTeal,
-                  showTrend: true,
-                  trendValue: 12.5,
+                  showTrend: monthlyIncome > 0,
+                  trendValue: 0.0, // Could calculate from previous month
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Additional Stats
+          Row(
+            children: [
+              Expanded(
+                child: StatsCard(
+                  title: 'Subscriptions',
+                  value: currencyFormat.format(subscriptionCost),
+                  icon: Icons.subscriptions_outlined,
+                  iconColor: FintechColors.accentOrange,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: StatsCard(
+                  title: 'Available',
+                  value: currencyFormat.format(remaining > 0 ? remaining : 0),
+                  icon: Icons.account_balance_wallet_outlined,
+                  iconColor: FintechColors.primaryBlue,
                 ),
               ),
             ],
@@ -288,28 +354,26 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
 
   Widget _buildQuickActions() {
     return Container(
-      height: 100,
+      height: 120,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         children: [
           SizedBox(
-            width: 100,
+            width: 110,
             child: QuickActionCard(
-              icon: Icons.camera_alt_outlined,
-              label: 'Scan Receipt',
+              icon: Icons.qr_code_scanner_rounded,
+              label: 'Scan',
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const ModernReceiptScannerScreen()),
               ),
-              gradient: FintechColors.primaryGradient,
-              iconColor: Colors.white,
-              textColor: Colors.white,
+              iconColor: const Color(0xFFFF6B35),
             ),
           ),
           const SizedBox(width: 12),
           SizedBox(
-            width: 100,
+            width: 110,
             child: QuickActionCard(
               icon: Icons.add_circle_outline,
               label: 'Add Expense',
@@ -319,20 +383,20 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
           ),
           const SizedBox(width: 12),
           SizedBox(
-            width: 100,
+            width: 110,
             child: QuickActionCard(
               icon: Icons.account_balance_outlined,
               label: 'Add Income',
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const IncomeTrackingScreen()),
+                MaterialPageRoute(builder: (_) => const IncomeTrackingScreenNew()),
               ),
               iconColor: FintechColors.accentTeal,
             ),
           ),
           const SizedBox(width: 12),
           SizedBox(
-            width: 100,
+            width: 110,
             child: QuickActionCard(
               icon: Icons.analytics_outlined,
               label: 'Insights',
@@ -370,7 +434,7 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
             subtitle: 'Manage recurring payments',
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const SubscriptionTrackerScreen()),
+              MaterialPageRoute(builder: (_) => const SubscriptionTrackerScreenNew()),
             ),
             iconColor: FintechColors.accentOrange,
           ),
@@ -379,7 +443,7 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
             icon: Icons.savings_outlined,
             title: 'Budget Planning',
             subtitle: 'Set and track spending limits',
-            onTap: () => _showBudgetModal(context),
+            onTap: () {},
             iconColor: FintechColors.accentGreen,
             isComingSoon: true,
           ),
@@ -411,7 +475,10 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
             icon: Icons.bar_chart,
             title: 'Spending Reports',
             subtitle: 'Detailed financial reports',
-            onTap: () => _showReportsModal(context),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ExpenseHistoryScreen()),
+            ),
             iconColor: FintechColors.accentTeal,
           ),
         ],
@@ -428,7 +495,7 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
             icon: Icons.cloud_upload_outlined,
             title: 'Export Data',
             subtitle: 'Backup and export your data',
-            onTap: () => _showExportModal(context),
+            onTap: () => _showExportOptions(context),
             iconColor: FintechColors.infoColor,
           ),
           const SizedBox(height: 12),
@@ -436,7 +503,10 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
             icon: Icons.security_outlined,
             title: 'Security',
             subtitle: 'Manage app security settings',
-            onTap: () => _showSecurityModal(context),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
             iconColor: FintechColors.warningColor,
           ),
         ],
@@ -517,20 +587,52 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
     );
   }
 
-  void _showBudgetModal(BuildContext context) {
-    // TODO: Implement budget modal
-  }
-
-  void _showReportsModal(BuildContext context) {
-    // TODO: Implement reports modal
-  }
-
-  void _showExportModal(BuildContext context) {
-    // TODO: Implement export modal
-  }
-
-  void _showSecurityModal(BuildContext context) {
-    // TODO: Implement security modal
+  void _showExportOptions(BuildContext context) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Export Data',
+              style: FintechTypography.h4.copyWith(color: theme.colorScheme.onSurface),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: Icon(Icons.table_chart, color: FintechColors.infoColor),
+              title: const Text('Export as CSV'),
+              subtitle: const Text('Export all data to CSV format'),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('CSV export coming soon')),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.picture_as_pdf, color: FintechColors.errorColor),
+              title: const Text('Export as PDF'),
+              subtitle: const Text('Generate PDF report'),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('PDF export coming soon')),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
   }
 
   @override

@@ -66,7 +66,7 @@ cp .env.example .env
 python run.py
 ```
 
-Backend runs at: `http://localhost:5000`
+Backend runs at: `https://finx-ugs5.onrender.com`
 
 ### 2. Mobile App Setup
 
@@ -75,7 +75,7 @@ Backend runs at: `http://localhost:5000`
 flutter pub get
 
 # Update backend URL in lib/services/api_service.dart
-# Change baseUrl to your backend IP (use computer IP, not localhost for device testing)
+# Change baseUrl to your Render URL (https://finx-ugs5.onrender.com) for production or your backend IP for local testing
 
 # Run on emulator/device
 flutter run
@@ -130,18 +130,4 @@ See [backend/README.md](backend/README.md) for complete API documentation and de
 - **Provider** - State management
 - **FL Chart** - Data visualization
 
-## 📄 License
 
-MIT License
-
----
-
-**⭐ Key Achievement: Fully functional OCR-based receipt scanning with AI categorization!**
-
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.

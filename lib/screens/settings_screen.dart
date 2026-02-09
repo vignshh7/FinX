@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/expense_provider.dart';
+import '../providers/income_provider.dart';
+import '../providers/subscription_provider.dart';
 import '../screens/login_screen.dart';
 import '../services/api_service.dart';
 
@@ -118,7 +121,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     if (confirmed == true && mounted) {
+      // Clear all provider caches before logging out
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final expenseProvider = Provider.of<ExpenseProvider>(context, listen: false);
+      final incomeProvider = Provider.of<IncomeProvider>(context, listen: false);
+      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+      
+      // Clear cached data from all providers
+      expenseProvider.clearCache();
+      incomeProvider.clearCache();
+      subscriptionProvider.clearCache();
+      
+      // Logout and clear auth data
       await authProvider.logout();
       
       if (mounted) {
@@ -141,170 +155,187 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(
         title: const Text('Settings'),
       ),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight,
-                ),
-                child: IntrinsicHeight(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // User Info
-                      Card(
-                        child: ListTile(
-                          leading: const CircleAvatar(
-                            child: Icon(Icons.person),
-                          ),
-                          title: Text(authProvider.user?.name ?? 'User'),
-                          subtitle: Text(authProvider.user?.email ?? ''),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
+      body: ListView(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: bottomPadding + 80,
+        ),
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          // User Info
+          Card(
+            child: ListTile(
+              leading: const CircleAvatar(
+                child: Icon(Icons.person),
+              ),
+              title: Text(authProvider.user?.name ?? 'User'),
+              subtitle: Text(authProvider.user?.email ?? ''),
+            ),
+          ),
+          const SizedBox(height: 24),
 
-                      // Budget Settings
-                      Text(
-                        'Budget',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      Card(
-                        child: ListTile(
-                          leading: const Icon(Icons.account_balance_wallet),
-                          title: const Text('Monthly Budget'),
-                          subtitle: Text(
-                            themeProvider.monthlyBudget > 0
-                                ? '${themeProvider.currency} ${themeProvider.monthlyBudget.toStringAsFixed(2)}'
-                                : 'Not set',
-                          ),
-                          trailing: const Icon(Icons.edit),
-                          onTap: _showBudgetDialog,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
+          // Budget Settings
+          Text(
+            'Budget',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.account_balance_wallet),
+              title: const Text('Monthly Budget'),
+              subtitle: Text(
+                themeProvider.monthlyBudget > 0
+                    ? '${themeProvider.currency} ${themeProvider.monthlyBudget.toStringAsFixed(2)}'
+                    : 'Not set',
+              ),
+              trailing: const Icon(Icons.edit),
+              onTap: _showBudgetDialog,
+            ),
+          ),
+          const SizedBox(height: 24),
 
-                      // Appearance
-                      Text(
-                        'Appearance',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      Card(
-                        child: Column(
-                          children: [
-                            SwitchListTile(
-                              secondary: Icon(
-                                themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
-                              ),
-                              title: const Text('Dark Mode'),
-                              subtitle: const Text('Toggle dark theme'),
-                              value: themeProvider.isDarkMode,
-                              onChanged: (value) {
-                                themeProvider.toggleTheme();
-                              },
-                            ),
-                            const Divider(height: 1),
-                            ListTile(
-                              leading: const Icon(Icons.attach_money),
-                              title: const Text('Currency'),
-                              subtitle: Text(themeProvider.currency),
-                              trailing: const Icon(Icons.arrow_drop_down),
-                              onTap: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => SimpleDialog(
-                                    title: const Text('Select Currency'),
-                                    children: _currencies.map((currency) {
-                                      return SimpleDialogOption(
-                                        onPressed: () {
-                                          themeProvider.setCurrency(currency);
-                                          Navigator.of(context).pop();
-                                        },
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 8),
-                                          child: Text(
-                                            currency,
-                                            style: TextStyle(
-                                              fontWeight: currency == themeProvider.currency
-                                                  ? FontWeight.bold
-                                                  : FontWeight.normal,
-                                              color: currency == themeProvider.currency
-                                                  ? Theme.of(context).primaryColor
-                                                  : null,
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // About
-                      Text(
-                        'About',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      Card(
-                        child: Column(
-                          children: [
-                            ListTile(
-                              leading: const Icon(Icons.cloud_outlined),
-                              title: const Text('Backend URL'),
-                              subtitle: Text(ApiService.baseUrl),
-                              trailing: const Icon(Icons.edit),
-                              onTap: _showBackendUrlDialog,
-                            ),
-                            const Divider(height: 1),
-                            ListTile(
-                              leading: const Icon(Icons.info),
-                              title: const Text('App Version'),
-                              subtitle: const Text('1.0.0'),
-                            ),
-                            const Divider(height: 1),
-                            ListTile(
-                              leading: const Icon(Icons.bug_report),
-                              title: const Text('Report a Bug'),
-                              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                              onTap: () {
-                                // TODO: Implement bug report
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Logout
-                      ElevatedButton.icon(
-                        onPressed: _logout,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        icon: const Icon(Icons.logout),
-                        label: const Text('Logout'),
-                      ),
-                      SizedBox(height: bottomPadding + 16),
-                    ],
+          // Appearance
+          Text(
+            'Appearance',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: themeProvider.isDarkMode
+                          ? const Color(0xFF3B82F6).withOpacity(0.1)
+                          : const Color(0xFFFBBF24).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      themeProvider.isDarkMode
+                          ? Icons.dark_mode
+                          : Icons.light_mode,
+                      color: themeProvider.isDarkMode
+                          ? const Color(0xFF3B82F6)
+                          : const Color(0xFFFBBF24),
+                    ),
+                  ),
+                  title: const Text(
+                    'Dark Mode',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    themeProvider.isDarkMode
+                        ? 'Dark theme enabled'
+                        : 'Light theme enabled',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  trailing: Switch(
+                    value: themeProvider.isDarkMode,
+                    onChanged: (value) {
+                      themeProvider.toggleTheme();
+                    },
+                    activeColor: const Color(0xFF3B82F6),
                   ),
                 ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.attach_money),
+                  title: const Text('Currency'),
+                  subtitle: Text(themeProvider.currency),
+                  trailing: const Icon(Icons.arrow_drop_down),
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => SimpleDialog(
+                        title: const Text('Select Currency'),
+                        children: _currencies.map((currency) {
+                          return SimpleDialogOption(
+                            onPressed: () {
+                              themeProvider.setCurrency(currency);
+                              Navigator.of(context).pop();
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                currency,
+                                style: TextStyle(
+                                  fontWeight: currency == themeProvider.currency
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  color: currency == themeProvider.currency
+                                      ? Theme.of(context).primaryColor
+                                      : null,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // About
+          Text(
+            'About',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.cloud_outlined),
+                  title: const Text('Backend URL'),
+                  subtitle: Text(ApiService.baseUrl),
+                  trailing: const Icon(Icons.edit),
+                  onTap: _showBackendUrlDialog,
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.info),
+                  title: const Text('App Version'),
+                  subtitle: const Text('1.0.0'),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.bug_report),
+                  title: const Text('Report a Bug'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () {
+                    // TODO: Implement bug report
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Logout
+          ElevatedButton.icon(
+            onPressed: _logout,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            icon: const Icon(Icons.logout),
+            label: const Text('Logout'),
+          ),
+          const SizedBox(height: 16),
+        ],
+    ),
+  );  }
 }

@@ -12,6 +12,25 @@ class ThemeProvider with ChangeNotifier {
   double get monthlyBudget => _monthlyBudget;
   bool get isInitialized => _isInitialized;
   
+  String get currencySymbol {
+    switch (_currency) {
+      case 'USD':
+        return '\$';
+      case 'EUR':
+        return '€';
+      case 'GBP':
+        return '£';
+      case 'INR':
+        return '₹';
+      case 'JPY':
+        return '¥';
+      case 'CNY':
+        return '¥';
+      default:
+        return '\$';
+    }
+  }
+  
   ThemeProvider() {
     _loadPreferences();
   }
@@ -39,18 +58,21 @@ class ThemeProvider with ChangeNotifier {
   Future<void> toggleTheme() async {
     try {
       _isDarkMode = !_isDarkMode;
+      notifyListeners(); // Notify immediately for instant UI update
+      
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('isDarkMode', _isDarkMode);
+      
       if (kDebugMode) {
-        print('Theme toggled: Dark=$_isDarkMode');
+        print('Theme toggled successfully: Dark=$_isDarkMode');
       }
-      notifyListeners();
     } catch (e) {
       if (kDebugMode) {
         print('Error toggling theme: $e');
       }
       // Revert on error
       _isDarkMode = !_isDarkMode;
+      notifyListeners();
     }
   }
   

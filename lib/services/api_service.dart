@@ -15,7 +15,7 @@ class ApiService {
   // - Android emulator: http://10.0.2.2:5000/api
   // - Physical device:  http://<your-computer-lan-ip>:5000/api
   static const String _baseUrlPrefKey = 'api_base_url';
-  static const String _defaultBaseUrl = 'http://10.0.2.2:5000/api';
+  static const String _defaultBaseUrl = 'https://finx-ugs5.onrender.com/api';
   static String _baseUrl = _defaultBaseUrl;
 
   static String get baseUrl => _baseUrl;
@@ -67,11 +67,23 @@ class ApiService {
           'email': email,
           'password': password,
         }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Connection timeout. Please check your internet connection.');
+        },
       );
       
       return _handleResponse(response);
+    } on SocketException {
+      throw Exception('No internet connection. Please check your network.');
+    } on http.ClientException {
+      throw Exception('Failed to connect to server. Please try again.');
     } catch (e) {
-      throw Exception('Registration failed: $e');
+      if (e.toString().contains('Exception:')) {
+        rethrow;
+      }
+      throw Exception('Registration failed: ${e.toString()}');
     }
   }
   
@@ -84,14 +96,26 @@ class ApiService {
           'email': email,
           'password': password,
         }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Connection timeout. Please check your internet connection.');
+        },
       );
       
       final data = _handleResponse(response);
       final user = User.fromJson(data);
       await saveToken(user.token);
       return user;
+    } on SocketException {
+      throw Exception('No internet connection. Please check your network.');
+    } on http.ClientException {
+      throw Exception('Failed to connect to server. Please try again.');
     } catch (e) {
-      throw Exception('Login failed: $e');
+      if (e.toString().contains('Exception:')) {
+        rethrow;
+      }
+      throw Exception('Login failed: ${e.toString()}');
     }
   }
   
@@ -102,6 +126,7 @@ class ApiService {
       if (token == null || token.isEmpty) {
         throw Exception('Not authenticated. Please login again.');
       }
+      
       var request = http.MultipartRequest(
         'POST',
         Uri.parse('$baseUrl/upload-receipt'),
@@ -113,13 +138,26 @@ class ApiService {
         imageFile.path,
       ));
       
-      final streamedResponse = await request.send();
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 45),
+        onTimeout: () {
+          throw Exception('Connection timeout. The server took too long to respond.');
+        },
+      );
+      
       final response = await http.Response.fromStream(streamedResponse);
       
       final data = _handleResponse(response);
       return OCRResult.fromJson(data);
+    } on SocketException {
+      throw Exception('No internet connection. Please check your network.');
+    } on http.ClientException {
+      throw Exception('Failed to connect to server. Please try again.');
     } catch (e) {
-      throw Exception('Receipt upload failed: $e');
+      if (e.toString().contains('Exception:')) {
+        rethrow;
+      }
+      throw Exception('Receipt upload failed: ${e.toString()}');
     }
   }
   

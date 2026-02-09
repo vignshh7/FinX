@@ -1,0 +1,34 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Flutter Clean & Pub Get",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"clean",
+				"&&",
+				"flutter",
+				"pub",
+				"get"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Flutter Clean & Pub Get",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"clean",
+				"&&",
+				"flutter",
+				"pub",
+				"get"
+			],
+			"isBackground": false,
+			"group": "build"
+		}
+	]
+}
