@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import os
-from app.services.simple_ocr_service import OCRService
+from app.services.ocr_service import OCRService  # Use real OCR service
 from app.services.simple_ml_service import ExpenseCategorizer
 
 ocr_bp = Blueprint('ocr', __name__)
