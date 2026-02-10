@@ -67,8 +67,9 @@ def upload_receipt():
             'date': ocr_result['date'],
             'predicted_category': category_result['predicted_category'],
             'confidence': category_result['confidence'],
-            'ocr_mode': ocr_result.get('ocr_mode', 'unknown'),
-            'tesseract_available': ocr_result.get('tesseract_available', False),
+            'ocr_provider': ocr_result.get('ocr_provider', 'google_cloud_vision'),
+            'ocr_mode': ocr_result.get('ocr_mode', 'cloud'),
+            'available': ocr_result.get('available', False),
             'processing_status': ocr_result.get('processing_status', 'unknown')
         }
         
@@ -80,21 +81,21 @@ def upload_receipt():
 @ocr_bp.route('/ocr-status', methods=['GET'])
 def ocr_status():
     """
-    Check OCR service status and Tesseract availability
+    Check OCR service status and Google Vision API availability
     """
     try:
-        tesseract_available = ocr_service.tesseract_available
-        
         return jsonify({
-            'tesseract_available': tesseract_available,
-            'mode': 'real_ocr' if tesseract_available else 'mock_development',
-            'message': 'Tesseract OCR is operational' if tesseract_available else 'Using mock OCR service - Install Tesseract for real scanning',
-            'installation_url': 'https://github.com/UB-Mannheim/tesseract/wiki' if not tesseract_available else None
+            'ocr_provider': 'google_cloud_vision',
+            'mode': 'cloud',
+            'available': ocr_service.available,
+            'message': 'Google Cloud Vision OCR is ready' if ocr_service.available else 'Google Vision API key not configured',
+            'api_endpoint': 'https://vision.googleapis.com/v1/images:annotate'
         }), 200
         
     except Exception as e:
         return jsonify({
-            'tesseract_available': False,
-            'mode': 'error',
-            'message': f'Error checking OCR status: {str(e)}'
+            'ocr_provider': 'google_cloud_vision',
+            'mode': 'cloud',
+            'available': False,
+            'message': f'Error: {str(e)}'
         }), 500
