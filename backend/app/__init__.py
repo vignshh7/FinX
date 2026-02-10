@@ -26,7 +26,13 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
     jwt.init_app(app)
-    CORS(app)
+    
+    # CORS Configuration - works for both local and production
+    cors_origins = os.getenv('CORS_ORIGINS', '*')
+    if cors_origins == '*':
+        CORS(app)
+    else:
+        CORS(app, origins=cors_origins.split(','))
     
     # Create upload folder
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)

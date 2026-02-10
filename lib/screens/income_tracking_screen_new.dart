@@ -53,7 +53,16 @@ class _IncomeTrackingScreenNewState extends State<IncomeTrackingScreenNew> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const AddIncomeSheet(),
+      builder: (context) => const IncomeFormSheet(),
+    );
+  }
+
+  void _showEditIncomeDialog(Income income) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => IncomeFormSheet(incomeToEdit: income),
     );
   }
 
@@ -250,7 +259,7 @@ class _IncomeTrackingScreenNewState extends State<IncomeTrackingScreenNew> {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              currencyFormat.format(income.amount),
+              '${income.currency} ${currencyFormat.format(income.amount)}',
               style: FintechTypography.bodyLarge.copyWith(
                 fontWeight: FontWeight.w700,
                 color: FintechColors.successColor,
@@ -273,7 +282,43 @@ class _IncomeTrackingScreenNewState extends State<IncomeTrackingScreenNew> {
               ),
           ],
         ),
+        onTap: () => _showIncomeOptions(income),
         onLongPress: () => _showDeleteDialog(income),
+      ),
+    );
+  }
+
+  void _showIncomeOptions(Income income) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit, color: FintechColors.primaryColor),
+              title: const Text('Edit Income'),
+              onTap: () {
+                Navigator.pop(context);
+                _showEditIncomeDialog(income);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: FintechColors.errorColor),
+              title: const Text('Delete Income'),
+              onTap: () {
+                Navigator.pop(context);
+                _showDeleteDialog(income);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: const Text('Cancel'),
+              onTap: () => Navigator.pop(context),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -340,14 +385,16 @@ class _IncomeTrackingScreenNewState extends State<IncomeTrackingScreenNew> {
   }
 }
 
-class AddIncomeSheet extends StatefulWidget {
-  const AddIncomeSheet({super.key});
+class IncomeFormSheet extends StatefulWidget {
+  final Income? incomeToEdit;
+  
+  const IncomeFormSheet({super.key, this.incomeToEdit});
 
   @override
-  State<AddIncomeSheet> createState() => _AddIncomeSheetState();
+  State<IncomeFormSheet> createState() => _IncomeFormSheetState();
 }
 
-class _AddIncomeSheetState extends State<AddIncomeSheet> {
+class _IncomeFormSheetState extends State<IncomeFormSheet> {
   final _formKey = GlobalKey<FormState>();
   final _sourceController = TextEditingController();
   final _amountController = TextEditingController();
@@ -366,6 +413,22 @@ class _AddIncomeSheetState extends State<AddIncomeSheet> {
     'Gift',
     'Other',
   ];
+
+  bool get _isEditMode => widget.incomeToEdit != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isEditMode) {
+      // Populate form with existing income data
+      _sourceController.text = widget.incomeToEdit!.source;
+      _amountController.text = widget.incomeToEdit!.amount.toString();
+      _notesController.text = widget.incomeToEdit!.notes ?? '';
+      _selectedCategory = widget.incomeToEdit!.category;
+      _selectedDate = widget.incomeToEdit!.date;
+      _isRecurring = widget.incomeToEdit!.isRecurring;
+    }
+  }
 
   @override
   void dispose() {
@@ -399,24 +462,31 @@ class _AddIncomeSheetState extends State<AddIncomeSheet> {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final incomeProvider = Provider.of<IncomeProvider>(context, listen: false);
+      
       final income = Income(
-        id: '',
+        id: _isEditMode ? widget.incomeToEdit!.id : '',
         userId: authProvider.user?.id.toString() ?? '0',
         source: _sourceController.text.trim(),
         amount: double.parse(_amountController.text),
+        currency: 'INR', // Default currency
         date: _selectedDate,
         category: _selectedCategory,
         isRecurring: _isRecurring,
         notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       );
 
-      await Provider.of<IncomeProvider>(context, listen: false).addIncome(income);
+      if (_isEditMode) {
+        await incomeProvider.updateIncome(income);
+      } else {
+        await incomeProvider.addIncome(income);
+      }
       
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Income added successfully'),
+          SnackBar(
+            content: Text(_isEditMode ? 'Income updated successfully' : 'Income added successfully'),
             backgroundColor: FintechColors.successColor,
           ),
         );
@@ -425,7 +495,7 @@ class _AddIncomeSheetState extends State<AddIncomeSheet> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to add income: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text('Failed to ${_isEditMode ? 'update' : 'add'} income: ${e.toString().replaceAll('Exception: ', '')}'),
             backgroundColor: FintechColors.errorColor,
           ),
         );
@@ -491,10 +561,10 @@ class _AddIncomeSheetState extends State<AddIncomeSheet> {
                           ),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.add_circle_outline, color: Colors.white, size: 24),
+                        child: Icon(_isEditMode ? Icons.edit : Icons.add_circle_outline, color: Colors.white, size: 24),
                       ),
                       const SizedBox(width: 12),
-                      Text('Add Income', style: FintechTypography.h5),
+                      Text(_isEditMode ? 'Edit Income' : 'Add Income', style: FintechTypography.h5),
                     ],
                   ),
                   IconButton(
@@ -725,7 +795,7 @@ class _AddIncomeSheetState extends State<AddIncomeSheet> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              'Adding Income...',
+                              _isEditMode ? 'Updating Income...' : 'Adding Income...',
                               style: FintechTypography.bodyLarge.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w600,
@@ -739,7 +809,7 @@ class _AddIncomeSheetState extends State<AddIncomeSheet> {
                             const Icon(Icons.check_circle_outline, size: 24),
                             const SizedBox(width: 8),
                             Text(
-                              'Add Income',
+                              _isEditMode ? 'Update Income' : 'Add Income',
                               style: FintechTypography.bodyLarge.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w600,

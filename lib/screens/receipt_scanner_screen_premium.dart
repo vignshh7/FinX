@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -24,7 +25,7 @@ class ReceiptScannerScreenPremium extends StatefulWidget {
 class _ReceiptScannerScreenPremiumState extends State<ReceiptScannerScreenPremium>
     with SingleTickerProviderStateMixin {
   final ImagePicker _picker = ImagePicker();
-  File? _selectedImage;
+  XFile? _selectedImage;
   bool _isProcessing = false;
   double _processingProgress = 0.0;
   late AnimationController _animationController;
@@ -59,7 +60,7 @@ class _ReceiptScannerScreenPremiumState extends State<ReceiptScannerScreenPremiu
 
       if (photo != null) {
         setState(() {
-          _selectedImage = File(photo.path);
+          _selectedImage = photo;
         });
         _animationController.forward();
         _showImagePreview();
@@ -85,7 +86,7 @@ class _ReceiptScannerScreenPremiumState extends State<ReceiptScannerScreenPremiu
 
       if (image != null) {
         setState(() {
-          _selectedImage = File(image.path);
+          _selectedImage = image;
         });
         _animationController.forward();
         _showImagePreview();
@@ -108,12 +109,19 @@ class _ReceiptScannerScreenPremiumState extends State<ReceiptScannerScreenPremiu
           // Image preview
           ClipRRect(
             borderRadius: AppSpacing.borderRadiusMd,
-            child: Image.file(
-              _selectedImage!,
-              height: 300,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
+            child: kIsWeb
+                ? Image.network(
+                    _selectedImage!.path,
+                    height: 300,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  )
+                : Image.file(
+                    File(_selectedImage!.path),
+                    height: 300,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
           ),
           
           AppSpacing.vSpaceXl,
@@ -154,7 +162,10 @@ class _ReceiptScannerScreenPremiumState extends State<ReceiptScannerScreenPremiu
   }
 
   /// Compress image with quality preservation
-  Future<File> _compressImage(File file) async {
+  Future<XFile> _compressImage(XFile file) async {
+    // On web, skip compression (not supported)
+    if (kIsWeb) return file;
+    
     final bytes = await file.readAsBytes();
     img.Image? image = img.decodeImage(bytes);
 
@@ -179,7 +190,7 @@ class _ReceiptScannerScreenPremiumState extends State<ReceiptScannerScreenPremiu
     );
     await compressedFile.writeAsBytes(compressedBytes);
 
-    return compressedFile;
+    return XFile(compressedFile.path);
   }
 
   /// Process receipt with animated progress

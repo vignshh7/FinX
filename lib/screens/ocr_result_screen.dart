@@ -5,6 +5,7 @@ import '../providers/expense_provider.dart';
 import '../providers/theme_provider.dart';
 import '../models/expense_model.dart';
 import '../models/category_model.dart';
+import 'home/home_screen.dart';
 
 class OCRResultScreen extends StatefulWidget {
   const OCRResultScreen({super.key});
@@ -104,7 +105,11 @@ class _OCRResultScreenState extends State<OCRResultScreen> {
           backgroundColor: Colors.green,
         ),
       );
-      Navigator.of(context).pop();
+      // Navigate to home screen and clear all previous routes
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (route) => false,
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
