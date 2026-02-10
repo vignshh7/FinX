@@ -107,10 +107,12 @@ class Income(db.Model):
     source = db.Column(db.String(150), nullable=False)
     category = db.Column(db.String(50), nullable=False, default='Other')
     amount = db.Column(db.Float, nullable=False)
+    currency = db.Column(db.String(3), nullable=False, default='INR')
     date = db.Column(db.Date, nullable=False)
     is_recurring = db.Column(db.Boolean, default=False)
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def to_dict(self):
         return {
@@ -119,10 +121,12 @@ class Income(db.Model):
             'source': self.source,
             'category': self.category,
             'amount': self.amount,
+            'currency': self.currency,
             'date': self.date.isoformat(),
             'is_recurring': self.is_recurring,
             'notes': self.notes,
             'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat() if self.updated_at else self.created_at.isoformat(),
         }
 
 

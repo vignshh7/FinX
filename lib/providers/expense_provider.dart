@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/expense_model.dart';
 import '../models/ocr_result_model.dart';
 import '../services/api_service.dart';
@@ -81,17 +82,20 @@ class ExpenseProvider with ChangeNotifier {
   }
   
   // Upload receipt for OCR
-  Future<OCRResult?> uploadReceipt(File imageFile) async {
+  Future<OCRResult?> uploadReceipt(XFile imageFile) async {
     _isLoading = true;
     notifyListeners();
     
     try {
+      print('📤 Uploading receipt: ${imageFile.path}');
       _lastOcrResult = await _apiService.uploadReceipt(imageFile);
+      print('✅ OCR Result received: ${_lastOcrResult?.store}, ${_lastOcrResult?.amount}');
       _error = null;
       _isLoading = false;
       notifyListeners();
       return _lastOcrResult;
     } catch (e) {
+      print('❌ Upload receipt error: $e');
       _error = e.toString();
       _isLoading = false;
       notifyListeners();

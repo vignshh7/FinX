@@ -101,6 +101,25 @@ class IncomeProvider with ChangeNotifier {
     }
   }
 
+  Future<void> updateIncome(Income income) async {
+    try {
+      final response = await _apiService.updateIncome(income.id, income.toJson());
+      final updatedIncome = Income.fromJson(response);
+      final index = _incomes.indexWhere((i) => i.id == income.id);
+      if (index != -1) {
+        _incomes[index] = updatedIncome;
+        _lastFetch = null; // Invalidate cache
+        notifyListeners();
+        if (kDebugMode) {
+          print('Income updated successfully, cache invalidated');
+        }
+      }
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    }
+  }
+
   Future<void> deleteIncome(String id) async {
     try {
       await _apiService.deleteIncome(id);

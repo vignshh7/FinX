@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -19,7 +20,7 @@ class ModernReceiptScannerScreen extends StatefulWidget {
 class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
     with TickerProviderStateMixin {
   final ImagePicker _picker = ImagePicker();
-  File? _selectedImage;
+  XFile? _selectedImage;
   bool _isProcessing = false;
   
   late AnimationController _animationController;
@@ -358,11 +359,17 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
               padding: const EdgeInsets.all(8),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.file(
-                  _selectedImage!,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
+                child: kIsWeb
+                    ? Image.network(
+                        _selectedImage!.path,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      )
+                    : Image.file(
+                        File(_selectedImage!.path),
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
               ),
             ),
           ),
@@ -433,12 +440,10 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
       );
 
       if (photo != null) {
-        final imageFile = File(photo.path);
-        
-        // Validate image
-        if (await _validateImage(imageFile)) {
+        // Validate image using XFile
+        if (await _validateImageXFile(photo)) {
           setState(() {
-            _selectedImage = imageFile;
+            _selectedImage = photo;
           });
           _animationController.reset();
           _animationController.forward();
@@ -462,12 +467,10 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
       );
 
       if (image != null) {
-        final imageFile = File(image.path);
-        
-        // Validate image
-        if (await _validateImage(imageFile)) {
+        // Validate image using XFile
+        if (await _validateImageXFile(image)) {
           setState(() {
-            _selectedImage = imageFile;
+            _selectedImage = image;
           });
           _animationController.reset();
           _animationController.forward();
@@ -478,15 +481,9 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
     }
   }
 
-  Future<bool> _validateImage(File imageFile) async {
+  Future<bool> _validateImageXFile(XFile imageFile) async {
     try {
-      // Check if file exists
-      if (!await imageFile.exists()) {
-        _showError('Image file not found.');
-        return false;
-      }
-
-      // Check file size (max 10MB)
+      // Check file size (max 10MB) using XFile method
       final fileSize = await imageFile.length();
       const maxSize = 10 * 1024 * 1024; // 10MB
       
@@ -502,7 +499,10 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
 
       return true;
     } catch (e) {
-      _showError('Failed to validate image.');
+      if (kDebugMode) {
+        print('Image validation error: $e');
+      }
+      _showError('Failed to validate image: ${e.toString()}');
       return false;
     }
   }
@@ -516,10 +516,14 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
       // Add haptic feedback
       HapticFeedback.mediumImpact();
       
+      print('🚀 Starting receipt processing...');
       final expenseProvider = Provider.of<ExpenseProvider>(context, listen: false);
       final result = await expenseProvider.uploadReceipt(_selectedImage!);
 
+      print('📊 Result: $result');
+      
       if (result != null && mounted) {
+        print('✅ Success! Navigating to result screen...');
         // Success - navigate to result screen
         Navigator.pushReplacement(
           context,
@@ -528,14 +532,19 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
           ),
         );
       } else {
+        print('❌ Result is null');
         if (mounted) {
+          // Get the actual error message from the provider
+          final errorMsg = expenseProvider.error ?? 'We couldn\'t extract data from this receipt. Please try again or enter details manually.';
+          print('Error message: $errorMsg');
           _showErrorWithRetry(
             'Processing Failed',
-            'We couldn\'t extract data from this receipt. Please try again or enter details manually.',
+            errorMsg,
           );
         }
       }
     } catch (e) {
+      print('❌ Exception in _processImage: $e');
       if (mounted) {
         String errorMessage = 'Failed to process receipt.';
         
@@ -547,6 +556,9 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
           errorMessage = 'Session expired. Please login again.';
         } else if (e.toString().contains('upload')) {
           errorMessage = 'Failed to upload image. Please try again.';
+        } else {
+          // Show the actual error message
+          errorMessage = e.toString();
         }
         
         _showErrorWithRetry('Upload Failed', errorMessage);

@@ -13,7 +13,7 @@ services:
         value: production
       - key: FLASK_APP
         value: run.py
-      - key: GOOGLE_VISION_API_KEY
+      - key: OCRSPACE_API_KEY
         sync: false
       - key: JWT_SECRET_KEY
         generateValue: true

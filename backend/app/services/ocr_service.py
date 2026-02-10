@@ -8,26 +8,20 @@ import io
 
 class OCRService:
     def __init__(self):
-        """Initialize Google Cloud Vision OCR service"""
-        self.api_key = os.getenv('GOOGLE_VISION_API_KEY')
-        self.api_endpoint = "https://vision.googleapis.com/v1/images:annotate"
+        """Initialize OCR.space OCR service"""
+        # Use provided API key as default, can be overridden with env variable
+        self.api_key = os.getenv('OCR_SPACE_API_KEY', 'K89677956988957')
+        self.api_endpoint = "https://api.ocr.space/parse/image"
         
-        if not self.api_key:
-            print("\n" + "="*60)
-            print("⚠ WARNING: GOOGLE_VISION_API_KEY not set!")
-            print("  Add GOOGLE_VISION_API_KEY in Render environment variables")
-            print("="*60 + "\n")
-            self.available = False
-        else:
-            print("\n" + "="*60)
-            print("✓ SUCCESS: Google Cloud Vision API configured")
-            print(f"  API Key: {self.api_key[:10]}...{self.api_key[-4:]}")
-            print("="*60 + "\n")
-            self.available = True
+        print("\n" + "="*60)
+        print("✓ SUCCESS: OCR.space API configured")
+        print(f"  API Key: {self.api_key[:10]}...{self.api_key[-4:]}")
+        print("="*60 + "\n")
+        self.available = True
     
     def extract_text_from_image(self, image_bytes):
         """
-        Extract text from image using Google Cloud Vision API
+        Extract text from image using OCR.space API
         
         Args:
             image_bytes: Raw image bytes
@@ -36,62 +30,56 @@ class OCRService:
             str: Extracted text from image
         """
         if not self.available:
-            raise Exception("Google Vision API key not configured")
+            raise Exception("OCR.space API key not configured")
         
         try:
             # Encode image to base64
             encoded_image = base64.b64encode(image_bytes).decode('utf-8')
             
-            # Build request payload
+            # Build request payload for OCR.space
             payload = {
-                "requests": [
-                    {
-                        "image": {
-                            "content": encoded_image
-                        },
-                        "features": [
-                            {
-                                "type": "TEXT_DETECTION",
-                                "maxResults": 1
-                            }
-                        ]
-                    }
-                ]
+                'base64Image': f'data:image/jpeg;base64,{encoded_image}',
+                'language': 'eng',
+                'isOverlayRequired': False,
+                'detectOrientation': True,
+                'scale': True,
+                'OCREngine': 2  # OCR.space engine 2 is more accurate
             }
             
-            # Call Google Vision API
+            headers = {
+                'apikey': self.api_key
+            }
+            
+            # Call OCR.space API
             response = requests.post(
-                f"{self.api_endpoint}?key={self.api_key}",
-                json=payload,
+                self.api_endpoint,
+                data=payload,
+                headers=headers,
                 timeout=30
             )
             
             # Handle errors
             if response.status_code != 200:
-                error_data = response.json()
-                if 'error' in error_data:
-                    error_msg = error_data['error'].get('message', 'Unknown error')
-                    raise Exception(f"Google Vision API error: {error_msg}")
                 raise Exception(f"API request failed with status {response.status_code}")
             
             # Parse response
             result = response.json()
             
-            if 'responses' not in result or len(result['responses']) == 0:
-                return ""
+            # Check if OCR was successful
+            if not result.get('IsErroredOnProcessing', True):
+                parsed_results = result.get('ParsedResults', [])
+                if parsed_results and len(parsed_results) > 0:
+                    full_text = parsed_results[0].get('ParsedText', '')
+                    return full_text.strip()
             
-            annotations = result['responses'][0]
-            
-            if 'textAnnotations' not in annotations or len(annotations['textAnnotations']) == 0:
-                return ""
-            
-            # First annotation contains full text
-            full_text = annotations['textAnnotations'][0]['description']
-            
-            return full_text.strip()
+            # Handle error in response
+            error_message = result.get('ErrorMessage', ['Unknown error'])
+            if isinstance(error_message, list):
+                error_message = ', '.join(error_message)
+            raise Exception(f"OCR.space API error: {error_message}")
             
         except requests.exceptions.Timeout:
-            raise Exception("Google Vision API request timed out")
+            raise Exception("OCR.space API request timed out")
         except requests.exceptions.RequestException as e:
             raise Exception(f"Network error: {str(e)}")
         except Exception as e:
@@ -197,14 +185,22 @@ class OCRService:
             with open(image_path, 'rb') as img_file:
                 image_bytes = img_file.read()
             
-            # Validate image
-            try:
-                img = Image.open(io.BytesIO(image_bytes))
-                img.verify()
-            except Exception:
-                raise Exception("Invalid image file")
+            # Validate image - lenient check
+            if len(image_bytes) == 0:
+                raise Exception("Empty image file")
             
-            # Extract text using Google Vision
+            try:
+                # Just verify we can open it, don't use verify()
+                img = Image.open(io.BytesIO(image_bytes))
+                # Check format is supported
+                if img.format not in ['JPEG', 'PNG', 'JPG', 'WEBP', 'BMP', 'GIF']:
+                    # Still try to process, OCR.space supports many formats
+                    pass
+            except Exception as e:
+                # If we can't even open it, it's truly invalid
+                raise Exception(f"Cannot read image file: {str(e)}")
+            
+            # Extract text using OCR.space
             extracted_text = self.extract_text_from_image(image_bytes)
             
             if not extracted_text:
@@ -215,7 +211,7 @@ class OCRService:
             
             # Add metadata
             structured_data['raw_text'] = extracted_text[:500]
-            structured_data['ocr_provider'] = 'google_cloud_vision'
+            structured_data['ocr_provider'] = 'ocrspace'
             structured_data['ocr_mode'] = 'cloud'
             structured_data['available'] = True
             structured_data['processing_status'] = 'success'
@@ -230,7 +226,7 @@ class OCRService:
                 'amount': 0.0,
                 'date': datetime.now().strftime('%Y-%m-%d'),
                 'raw_text': '',
-                'ocr_provider': 'google_cloud_vision',
+                'ocr_provider': 'ocrspace',
                 'ocr_mode': 'cloud',
                 'available': self.available,
                 'processing_status': 'failed',
