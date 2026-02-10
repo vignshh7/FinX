@@ -79,9 +79,9 @@ def upload_receipt():
 
 @ocr_bp.route('/ocr-status', methods=['GET'])
 def ocr_status():
-    \"\"\"
+    """
     Check OCR service status and Tesseract availability
-    \"\"\"
+    """
     try:
         tesseract_available = ocr_service.tesseract_available
         
