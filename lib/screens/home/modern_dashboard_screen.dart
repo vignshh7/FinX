@@ -713,11 +713,19 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
       ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -725,13 +733,14 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
       child: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
           child: Form(
             key: _formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Handle bar
                 Center(
                   child: Container(
                     width: 48,
@@ -742,20 +751,47 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Add Expense',
-                  style: FintechTypography.h4.copyWith(color: cs.onSurface),
+                const SizedBox(height: 20),
+                
+                // Header with icon
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            gradient: FintechColors.primaryGradient,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.receipt_long, color: Colors.white, size: 24),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Add Expense',
+                          style: FintechTypography.h5.copyWith(color: cs.onSurface),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
 
                 TextFormField(
                   controller: _storeController,
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
+                  style: FintechTypography.bodyLarge,
+                  decoration: InputDecoration(
                     labelText: 'Store / Merchant',
-                    hintText: 'e.g., Grocery Store',
-                    prefixIcon: Icon(Icons.storefront_outlined),
+                    hintText: 'e.g., Walmart, Amazon',
+                    prefixIcon: Icon(Icons.storefront_outlined, color: FintechColors.primaryColor),
+                    filled: true,
+                    fillColor: isDark ? FintechColors.darkSurface : Colors.grey.shade50,
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -764,7 +800,7 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
 
                 TextFormField(
                   controller: _amountController,
@@ -783,54 +819,181 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 20),
 
-                DropdownButtonFormField<String>(
-                  value: _category,
-                  decoration: const InputDecoration(
-                    labelText: 'Category',
-                    prefixIcon: Icon(Icons.category_outlined),
-                  ),
-                  items: ExpenseCategory.allCategories
-                      .map(
-                        (c) => DropdownMenuItem(
-                          value: c,
-                          child: Text(c),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() => _category = value);
-                  },
+                // Category Selection with Visual Cards
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Category',
+                      style: FintechTypography.bodyLarge.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: ExpenseCategory.allCategories.map((cat) {
+                        final isSelected = _category == cat;
+                        final categoryColor = ExpenseCategory.getColor(cat);
+                        final categoryIcon = ExpenseCategory.getIcon(cat);
+                        return InkWell(
+                          onTap: () => setState(() => _category = cat),
+                          borderRadius: BorderRadius.circular(12),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? categoryColor
+                                  : (isDark ? FintechColors.darkSurface : Colors.grey.shade100),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected
+                                    ? categoryColor
+                                    : (isDark ? FintechColors.borderColor : Colors.grey.shade300),
+                                width: 2,
+                              ),
+                              boxShadow: isSelected
+                                  ? [
+                                      BoxShadow(
+                                        color: categoryColor.withOpacity(0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : [],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  categoryIcon,
+                                  color: isSelected ? Colors.white : categoryColor,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  cat,
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.white : cs.onSurface,
+                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 20),
 
+                // Date Picker with better design
                 InkWell(
                   onTap: _pickDate,
                   borderRadius: BorderRadius.circular(12),
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Date',
-                      prefixIcon: Icon(Icons.calendar_today_outlined),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? FintechColors.darkSurface : Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isDark ? FintechColors.borderColor : Colors.grey.shade300,
+                      ),
                     ),
-                    child: Text(DateFormat('yyyy-MM-dd').format(_date)),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today_outlined,
+                          color: FintechColors.primaryColor,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Date',
+                                style: FintechTypography.bodySmall.copyWith(
+                                  color: cs.onSurface.withOpacity(0.6),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                DateFormat('MMMM dd, yyyy').format(_date),
+                                style: FintechTypography.bodyLarge.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: cs.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: cs.onSurface.withOpacity(0.4),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
 
-                SizedBox(
-                  width: double.infinity,
+                // Submit Button with gradient
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: _isSaving
+                        ? LinearGradient(
+                            colors: [Colors.grey.shade400, Colors.grey.shade500],
+                          )
+                        : FintechColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: _isSaving
+                        ? []
+                        : [
+                            BoxShadow(
+                              color: FintechColors.primaryColor.withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                  ),
                   child: ElevatedButton.icon(
                     onPressed: _isSaving ? null : _save,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      shadowColor: Colors.transparent,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      minimumSize: const Size(double.infinity, 56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                     icon: _isSaving
                         ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
                           )
-                        : const Icon(Icons.check_rounded),
-                    label: Text(_isSaving ? 'Saving...' : 'Save Expense'),
+                        : const Icon(Icons.check_circle_outline, size: 24),
+                    label: Text(
+                      _isSaving ? 'Adding Expense...' : 'Add Expense',
+                      style: FintechTypography.bodyLarge.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
               ],

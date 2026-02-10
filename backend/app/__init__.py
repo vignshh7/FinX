@@ -39,6 +39,7 @@ def create_app():
     from app.routes.budget import budget_bp
     from app.routes.income import incomes_bp
     from app.routes.analytics import analytics_bp
+    from app.routes.ai_routes import ai_bp
     
     app.register_blueprint(auth_bp, url_prefix='/api')
     app.register_blueprint(expenses_bp, url_prefix='/api')
@@ -47,6 +48,7 @@ def create_app():
     app.register_blueprint(budget_bp, url_prefix='/api')
     app.register_blueprint(incomes_bp, url_prefix='/api')
     app.register_blueprint(analytics_bp, url_prefix='/api')
+    app.register_blueprint(ai_bp, url_prefix='/api')
     
     # Create tables
     with app.app_context():
@@ -55,6 +57,10 @@ def create_app():
     @app.route('/')
     def index():
         return {'message': 'Smart Finance API', 'version': '1.0.0'}
+    
+    @app.route('/api/health')
+    def health():
+        return {'status': 'healthy', 'service': 'finx-backend'}, 200
     
     return app
 
