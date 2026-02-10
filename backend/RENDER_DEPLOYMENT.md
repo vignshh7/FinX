@@ -64,10 +64,10 @@ After deployment completes:
 
 ```bash
 # Check health
-curl https://finx-backend.onrender.com/api/health
+curl https://finx-ugs5.onrender.com/api/health
 
 # Check OCR status
-curl https://finx-backend.onrender.com/api/ocr-status
+curl https://finx-ugs5.onrender.com/api/ocr-status
 ```
 
 Expected response:
@@ -86,7 +86,7 @@ Update [lib/services/api_service.dart](../lib/services/api_service.dart):
 
 ```dart
 class ApiService {
-  static const String baseUrl = 'https://finx-backend.onrender.com/api';
+  static const String baseUrl = 'https://finx-ugs5.onrender.com/api';
   // ... rest of code
 }
 ```
@@ -131,4 +131,4 @@ Upgrade to paid plan for production use.
 4. Configure production database
 5. Set up monitoring/alerts
 
-**Your backend will be live at:** `https://finx-backend.onrender.com` 🚀
+**Your backend is live at:** `https://finx-ugs5.onrender.com` 🚀
