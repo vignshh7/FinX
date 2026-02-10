@@ -9,24 +9,57 @@ import os
 class OCRService:
     def __init__(self):
         # Set Tesseract path (update based on installation)
-        # Common paths on Windows: C:/Program Files/Tesseract-OCR/tesseract.exe
-        # On Linux/Mac: usually just 'tesseract'
-        tesseract_path = os.getenv('TESSERACT_CMD', 'tesseract')
+        # Common paths:
+        # Windows: C:/Program Files/Tesseract-OCR/tesseract.exe
+        # Linux: /usr/bin/tesseract
+        # Mac: /usr/local/bin/tesseract
         
-        # Check if custom path exists
-        if tesseract_path != 'tesseract' and os.path.exists(tesseract_path):
-            pytesseract.pytesseract.tesseract_cmd = tesseract_path
+        # Try to auto-detect Tesseract on Windows
+        possible_paths = [
+            os.getenv('TESSERACT_CMD'),  # Environment variable (Render.com)
+            os.getenv('TESSERACT_PATH'),  # Alternative env var
+            '/usr/bin/tesseract',  # Linux (Render, Ubuntu, Debian)
+            '/usr/local/bin/tesseract',  # Mac/Linux
+            r'C:\Program Files\Tesseract-OCR\tesseract.exe',  # Windows
+            r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',  # Windows 32-bit
+            'tesseract'  # System PATH
+        ]
+        
+        tesseract_found = False
+        tesseract_path = None
+        
+        for path in possible_paths:
+            if path and path != 'tesseract':
+                if os.path.exists(path):
+                    pytesseract.pytesseract.tesseract_cmd = path
+                    tesseract_path = path
+                    tesseract_found = True
+                    break
         
         # Verify Tesseract is available
         try:
-            pytesseract.get_tesseract_version()
+            version = pytesseract.get_tesseract_version()
             self.tesseract_available = True
-            print("✓ Tesseract OCR is available")
+            print(f"\n{'='*60}")
+            print(f"✓ SUCCESS: Tesseract OCR v{version} is available!")
+            if tesseract_path:
+                print(f"  Path: {tesseract_path}")
+            print(f"{'='*60}\n")
         except Exception as e:
             self.tesseract_available = False
-            print(f"⚠ Warning: Tesseract OCR not available - {str(e)}")
-            print("Install Tesseract from: https://github.com/UB-Mannheim/tesseract/wiki")
-            print("For now, using fallback mock OCR service")
+            print(f"\n{'='*60}")
+            print(f"⚠ WARNING: Tesseract OCR not found!")
+            print(f"  Error: {str(e)}")
+            print(f"\n  INSTALLATION INSTRUCTIONS:")
+            print(f"  -------------------------")
+            print(f"  Windows: Download from https://github.com/UB-Mannheim/tesseract/wiki")
+            print(f"           Install to: C:\\Program Files\\Tesseract-OCR")
+            print(f"  Linux:   sudo apt install tesseract-ocr")
+            print(f"  Mac:     brew install tesseract")
+            print(f"\n  OR set environment variable:")
+            print(f"  TESSERACT_CMD=C:\\path\\to\\tesseract.exe")
+            print(f"\n  Currently using MOCK OCR service for development")
+            print(f"{'='*60}\n")
     
     def preprocess_image(self, image_path):
         """
@@ -399,16 +432,26 @@ class OCRService:
         try:
             # Check if Tesseract is available
             if not self.tesseract_available:
-                print("⚠ Tesseract not available, using mock data")
+                print("\n" + "="*60)
+                print("⚠ FALLBACK MODE: Using Mock OCR Service")
+                print("  Real OCR disabled - Install Tesseract for actual scanning")
+                print("="*60 + "\n")
                 from app.services.simple_ocr_service import SimpleOCRService
                 mock_service = SimpleOCRService()
-                return mock_service.process_receipt(image_path)
+                result = mock_service.process_receipt(image_path)
+                result['ocr_mode'] = 'mock'
+                result['tesseract_available'] = False
+                return result
             
-            print(f"Processing receipt with Tesseract OCR: {image_path}")
+            print(f"\n{'='*60}")
+            print(f"🔍 Processing receipt with REAL Tesseract OCR")
+            print(f"   Image: {image_path}")
+            print(f"{'='*60}")
             
             # Extract text with improved OCR
             raw_text = self.extract_text(image_path)
-            print(f"Extracted text: {raw_text[:200]}...")  # First 200 chars for debug
+            print(f"\n📄 Extracted {len(raw_text)} characters")
+            print(f"   Preview: {raw_text[:200].replace(chr(10), ' ')}...")
             
             # Extract structured data with enhanced parsing
             structured_data = self.extract_structured_data(raw_text)
@@ -416,16 +459,30 @@ class OCRService:
             # Add processing metadata
             structured_data['raw_text'] = raw_text
             structured_data['processing_status'] = 'success'
+            structured_data['ocr_mode'] = 'tesseract'
+            structured_data['tesseract_available'] = True
+            
+            print(f"\n✓ OCR Processing Complete:")
+            print(f"   Store: {structured_data['store']}")
+            print(f"   Amount: ${structured_data['amount']:.2f}")
+            print(f"   Items: {len(structured_data['items'])}")
+            print(f"   Confidence: {structured_data['confidence']}")
+            print(f"{'='*60}\n")
             
             return structured_data
             
         except Exception as e:
-            print(f"Error processing receipt: {e}")
+            print(f"\n❌ ERROR in OCR Processing: {e}")
+            print(f"   Falling back to mock service\n")
             # Fallback to mock data on error
             try:
                 from app.services.simple_ocr_service import SimpleOCRService
                 mock_service = SimpleOCRService()
-                return mock_service.process_receipt(image_path)
+                result = mock_service.process_receipt(image_path)
+                result['ocr_mode'] = 'mock_fallback'
+                result['tesseract_available'] = False
+                result['error'] = str(e)
+                return result
             except:
                 return {
                     'store': 'Processing Error',
@@ -434,5 +491,7 @@ class OCRService:
                     'date': datetime.now().strftime('%Y-%m-%d'),
                     'raw_text': f"Error: {str(e)}",
                     'processing_status': 'error',
-                    'confidence': 'low'
+                    'confidence': 'low',
+                    'ocr_mode': 'error',
+                    'tesseract_available': False
                 }

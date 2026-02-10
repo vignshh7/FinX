@@ -66,10 +66,35 @@ def upload_receipt():
             'amount': ocr_result['amount'],
             'date': ocr_result['date'],
             'predicted_category': category_result['predicted_category'],
-            'confidence': category_result['confidence']
+            'confidence': category_result['confidence'],
+            'ocr_mode': ocr_result.get('ocr_mode', 'unknown'),
+            'tesseract_available': ocr_result.get('tesseract_available', False),
+            'processing_status': ocr_result.get('processing_status', 'unknown')
         }
         
         return jsonify(response), 200
         
     except Exception as e:
         return jsonify({'message': f'OCR processing failed: {str(e)}'}), 500
+
+@ocr_bp.route('/ocr-status', methods=['GET'])
+def ocr_status():
+    \"\"\"
+    Check OCR service status and Tesseract availability
+    \"\"\"
+    try:
+        tesseract_available = ocr_service.tesseract_available
+        
+        return jsonify({
+            'tesseract_available': tesseract_available,
+            'mode': 'real_ocr' if tesseract_available else 'mock_development',
+            'message': 'Tesseract OCR is operational' if tesseract_available else 'Using mock OCR service - Install Tesseract for real scanning',
+            'installation_url': 'https://github.com/UB-Mannheim/tesseract/wiki' if not tesseract_available else None
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'tesseract_available': False,
+            'mode': 'error',
+            'message': f'Error checking OCR status: {str(e)}'
+        }), 500

@@ -144,7 +144,9 @@ class _IncomeTrackingScreenNewState extends State<IncomeTrackingScreenNew> {
                           const SizedBox(height: 8),
                           Text(
                             netSavings >= 0
-                                ? '${((netSavings / incomeProvider.monthlyTotal) * 100).toStringAsFixed(1)}% of income saved'
+                                ? incomeProvider.monthlyTotal > 0
+                                    ? '${((netSavings / incomeProvider.monthlyTotal) * 100).toStringAsFixed(1)}% of income saved'
+                                    : 'No income recorded'
                                 : 'Spending exceeds income',
                             style: FintechTypography.bodyMedium.copyWith(
                               color: Colors.white.withOpacity(0.9),
@@ -373,6 +375,23 @@ class _AddIncomeSheetState extends State<AddIncomeSheet> {
     super.dispose();
   }
 
+  IconData _getIconForCategory(String category) {
+    switch (category.toLowerCase()) {
+      case 'salary':
+        return Icons.work_outline;
+      case 'freelance':
+        return Icons.laptop_outlined;
+      case 'business':
+        return Icons.business_outlined;
+      case 'investment':
+        return Icons.trending_up;
+      case 'gift':
+        return Icons.card_giftcard_outlined;
+      default:
+        return Icons.attach_money;
+    }
+  }
+
   Future<void> _submitIncome() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -418,26 +437,66 @@ class _AddIncomeSheetState extends State<AddIncomeSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cs = theme.colorScheme;
+
     return Container(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        color: cs.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
       ),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 48,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.onSurface.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              // Header with icon
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Add Income', style: FintechTypography.h5),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [FintechColors.successColor, FintechColors.successColor.withOpacity(0.7)],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.add_circle_outline, color: Colors.white, size: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      Text('Add Income', style: FintechTypography.h5),
+                    ],
+                  ),
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.pop(context),
@@ -478,19 +537,66 @@ class _AddIncomeSheetState extends State<AddIncomeSheet> {
               ),
               const SizedBox(height: 16),
 
-              // Category Dropdown
-              DropdownButtonFormField<String>(
-                value: _selectedCategory,
-                decoration: const InputDecoration(
-                  labelText: 'Category',
-                  prefixIcon: Icon(Icons.category_outlined),
-                ),
-                items: _categories.map((cat) {
-                  return DropdownMenuItem(value: cat, child: Text(cat));
-                }).toList(),
-                onChanged: (value) => setState(() => _selectedCategory = value!),
+              // Category Selection with Visual Cards
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Category',
+                    style: FintechTypography.bodyLarge.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _categories.map((cat) {
+                      final isSelected = _selectedCategory == cat;
+                      return InkWell(
+                        onTap: () => setState(() => _selectedCategory = cat),
+                        borderRadius: BorderRadius.circular(12),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? FintechColors.successColor
+                                : (isDark ? FintechColors.darkSurface : Colors.grey.shade100),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected
+                                  ? FintechColors.successColor
+                                  : (isDark ? FintechColors.borderColor : Colors.grey.shade300),
+                              width: 2,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _getIconForCategory(cat),
+                                color: isSelected ? Colors.white : cs.onSurface,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                cat,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : cs.onSurface,
+                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
               // Date Picker
               InkWell(
@@ -513,15 +619,57 @@ class _AddIncomeSheetState extends State<AddIncomeSheet> {
               ),
               const SizedBox(height: 16),
 
-              // Recurring Switch
-              SwitchListTile(
-                title: const Text('Recurring Income'),
-                subtitle: const Text('This income repeats monthly'),
-                value: _isRecurring,
-                onChanged: (value) => setState(() => _isRecurring = value),
-                contentPadding: EdgeInsets.zero,
+              // Recurring Switch with better design
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _isRecurring
+                      ? FintechColors.infoColor.withOpacity(0.1)
+                      : (isDark ? FintechColors.darkSurface : Colors.grey.shade50),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _isRecurring
+                        ? FintechColors.infoColor
+                        : (isDark ? FintechColors.borderColor : Colors.grey.shade200),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.repeat,
+                      color: _isRecurring ? FintechColors.infoColor : cs.onSurface.withOpacity(0.5),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Recurring Income',
+                            style: FintechTypography.bodyMedium.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: cs.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'This income repeats monthly',
+                            style: FintechTypography.bodySmall.copyWith(
+                              color: cs.onSurface.withOpacity(0.6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: _isRecurring,
+                      onChanged: (value) => setState(() => _isRecurring = value),
+                      activeColor: FintechColors.infoColor,
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
               // Notes Field
               TextFormField(
@@ -535,25 +683,71 @@ class _AddIncomeSheetState extends State<AddIncomeSheet> {
               ),
               const SizedBox(height: 24),
 
-              // Submit Button
-              ElevatedButton(
-                onPressed: _isSubmitting ? null : _submitIncome,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: FintechColors.successColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              // Submit Button with gradient
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: _isSubmitting
+                        ? [Colors.grey.shade400, Colors.grey.shade500]
+                        : [FintechColors.successColor, FintechColors.successColor.withOpacity(0.8)],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: _isSubmitting
+                      ? []
+                      : [
+                          BoxShadow(
+                            color: FintechColors.successColor.withOpacity(0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                 ),
-                child: _isSubmitting
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                child: ElevatedButton(
+                  onPressed: _isSubmitting ? null : _submitIncome,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: Colors.white,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: _isSubmitting
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Adding Income...',
+                              style: FintechTypography.bodyLarge.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.check_circle_outline, size: 24),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Add Income',
+                              style: FintechTypography.bodyLarge.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
-                      )
-                    : const Text('Add Income', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                ),
               ),
             ],
           ),

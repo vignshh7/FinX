@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: finx-backend
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: |
+      apt-get update
+      apt-get install -y tesseract-ocr tesseract-ocr-eng libtesseract-dev
+      pip install -r requirements.txt
+    startCommand: python run.py
+    healthCheckPath: /api/health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_APP
+        value: run.py
+      - key: TESSERACT_PATH
+        value: /usr/bin/tesseract
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        value: "*"
