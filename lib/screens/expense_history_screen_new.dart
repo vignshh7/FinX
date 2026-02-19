@@ -46,10 +46,19 @@ class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
   }
 
   List<Expense> _filterAndSortExpenses(List<Expense> expenses) {
-    // Apply search filter
+    // Apply date filter
     var filtered = expenses;
+    if (_startDate != null && _endDate != null) {
+      final start = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
+      final end = DateTime(_endDate!.year, _endDate!.month, _endDate!.day, 23, 59, 59, 999);
+      filtered = filtered.where((expense) {
+        return !expense.date.isBefore(start) && !expense.date.isAfter(end);
+      }).toList();
+    }
+
+    // Apply search filter
     if (_searchQuery.isNotEmpty) {
-      filtered = expenses.where((expense) {
+      filtered = filtered.where((expense) {
         return expense.store.toLowerCase().contains(_searchQuery.toLowerCase()) ||
             expense.category.toLowerCase().contains(_searchQuery.toLowerCase());
       }).toList();
@@ -108,6 +117,33 @@ class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
         );
       }
     }
+  }
+
+  void _setFilterToCurrentMonth() {
+    final now = DateTime.now();
+    setState(() {
+      _startDate = DateTime(now.year, now.month, 1);
+      _endDate = DateTime(now.year, now.month + 1, 0);
+    });
+    _loadExpenses();
+  }
+
+  void _setFilterToPastMonth() {
+    final now = DateTime.now();
+    setState(() {
+      _startDate = DateTime(now.year, now.month - 1, 1);
+      _endDate = DateTime(now.year, now.month, 0);
+    });
+    _loadExpenses();
+  }
+
+  void _setFilterToLast30Days() {
+    final now = DateTime.now();
+    setState(() {
+      _startDate = now.subtract(const Duration(days: 30));
+      _endDate = now;
+    });
+    _loadExpenses();
   }
 
   Future<void> _showDateRangeFilter() async {
@@ -313,6 +349,40 @@ class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
                       ],
                     ],
                   ),
+                  
+                  const SizedBox(height: 12),
+                  
+                  // Quick Date Filters
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildQuickFilterButton(
+                          'This Month',
+                          Icons.calendar_today,
+                          _setFilterToCurrentMonth,
+                          isDark,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildQuickFilterButton(
+                          'Past Month',
+                          Icons.history,
+                          _setFilterToPastMonth,
+                          isDark,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildQuickFilterButton(
+                          'Last 30 Days',
+                          Icons.access_time,
+                          _setFilterToLast30Days,
+                          isDark,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -462,6 +532,29 @@ class _ExpenseHistoryScreenState extends State<ExpenseHistoryScreen> {
         labelStyle: TextStyle(
           color: isSelected ? Colors.white : (isDark ? FintechColors.darkText : FintechColors.lightText),
           fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickFilterButton(String label, IconData icon, VoidCallback onTap, bool isDark) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 16),
+      label: Text(
+        label,
+        style: FintechTypography.caption.copyWith(
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: FintechColors.primaryColor,
+        side: BorderSide(
+          color: FintechColors.primaryColor.withOpacity(0.3),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
         ),
       ),
     );

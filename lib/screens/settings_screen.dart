@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
@@ -6,6 +7,7 @@ import '../providers/expense_provider.dart';
 import '../providers/income_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../screens/login_screen.dart';
+import '../screens/debug/test_data_populator_screen.dart';
 import '../services/api_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -140,6 +142,107 @@ class _SettingsScreenState extends State<SettingsScreen> {
           MaterialPageRoute(builder: (_) => const LoginScreen()),
           (route) => false,
         );
+      }
+    }
+  }
+
+  Future<void> _showClearDataDialog(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Clear All Data'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('This will permanently delete:'),
+            SizedBox(height: 8),
+            Text('• All expenses and receipts'),
+            Text('• All income records'),
+            Text('• All subscriptions'),
+            Text('• All budgets and savings goals'),
+            Text('• All bill reminders'),
+            SizedBox(height: 16),
+            Text(
+              'This action cannot be undone!',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.red,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Clear All Data'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Clearing data...'),
+            ],
+          ),
+        ),
+      );
+
+      try {
+        // Clear all provider caches and data
+        final expenseProvider = Provider.of<ExpenseProvider>(context, listen: false);
+        final incomeProvider = Provider.of<IncomeProvider>(context, listen: false);
+        final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+        
+        // Clear cached data from all providers
+        expenseProvider.clearCache();
+        incomeProvider.clearCache();
+        subscriptionProvider.clearCache();
+        
+        // TODO: Add API calls to clear backend data if needed
+        // await _apiService.clearAllData();
+        
+        if (mounted) {
+          Navigator.of(context).pop(); // Close loading dialog
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('All data cleared successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          Navigator.of(context).pop(); // Close loading dialog
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error clearing data: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -313,6 +416,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 24),
+
+          // Debug section (only in debug mode)
+          if (kDebugMode) ...[
+            Text(
+              'Debug',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Card(
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.science,
+                        color: Colors.orange,
+                      ),
+                    ),
+                    title: const Text(
+                      'Populate Test Data',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: const Text('Add realistic sample data for testing'),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TestDataPopulatorWidget(),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.clear_all,
+                        color: Colors.red,
+                      ),
+                    ),
+                    title: const Text(
+                      'Clear All Data',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: const Text('Remove all expenses, income, and settings'),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () => _showClearDataDialog(context),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
 
           // Logout
           ElevatedButton.icon(

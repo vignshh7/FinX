@@ -145,9 +145,12 @@ class ComprehensiveAIService:
         if len(monthly_totals) < 3:
             return {
                 'predicted_amount': 0.0,
-                'confidence': 'low',
-                'confidence_range': (0.0, 0.0),
+                'next_month_prediction': 0.0,
+                'confidence': 0.3,
+                'confidence_level': 'low',
+                'confidence_range': [0.0, 0.0],
                 'based_on_months': len(monthly_totals),
+                'trend': 'stable',
                 'message': 'Not enough data for prediction'
             }
         
@@ -174,15 +177,19 @@ class ComprehensiveAIService:
         )
         
         # Confidence level based on data availability
-        confidence = 'high' if len(monthly_totals) >= 6 else 'medium'
+        confidence_score = 0.9 if len(monthly_totals) >= 6 else 0.65
+        confidence_label = 'high' if len(monthly_totals) >= 6 else 'medium'
+        trend_direction = 'increasing' if predicted > np.mean(y) else 'decreasing'
         
         return {
             'predicted_amount': round(float(predicted), 2),
-            'confidence': confidence,
-            'confidence_range': (round(confidence_range[0], 2), round(confidence_range[1], 2)),
+            'next_month_prediction': round(float(predicted), 2),
+            'confidence': round(float(confidence_score), 2),
+            'confidence_level': confidence_label,
+            'confidence_range': [round(confidence_range[0], 2), round(confidence_range[1], 2)],
             'based_on_months': len(monthly_totals),
             'historical_average': round(np.mean(y), 2),
-            'trend': 'increasing' if predicted > np.mean(y) else 'decreasing'
+            'trend': trend_direction
         }
     
     # =====================================================================
@@ -230,7 +237,7 @@ class ComprehensiveAIService:
                     'category': expense.category,
                     'date': expense.date.isoformat(),
                     'deviation': round(((expense.amount - mean) / std), 2),
-                    'message': f'Unusually high expense: {expense.amount:.2f} (avg: {mean:.2f})'
+'message': f"Unusually high expense: {expense.amount:.2f} (avg: {mean:.2f})"
                 })
         
         return {
@@ -276,8 +283,8 @@ class ComprehensiveAIService:
                 'category': 'budget',
                 'title': 'Spending May Exceed Income',
                 'message': f"Based on your spending pattern, you're predicted to spend "
-                          f"${prediction['predicted_amount']:.2f} next month, which exceeds "
-                          f"your current monthly income of ${monthly_income:.2f}.",
+                          f"₹{prediction['predicted_amount']:.2f} next month, which exceeds "
+                          f"your current monthly income of ₹{monthly_income:.2f}.",
                 'recommendation': 'Consider reducing discretionary spending or finding additional income sources.',
                 'priority': 'high'
             })
@@ -292,7 +299,7 @@ class ComprehensiveAIService:
                     'category': 'spending_pattern',
                     'title': 'High Food Expenses',
                     'message': f"Your food spending is {percentage:.1f}% of total expenses "
-                              f"(${amount:.2f}), which is higher than recommended.",
+                              f"(₹{amount:.2f}), which is higher than recommended.",
                     'recommendation': 'Consider meal planning and cooking at home to reduce food costs.',
                     'priority': 'medium'
                 })
@@ -327,8 +334,8 @@ class ComprehensiveAIService:
                     'type': 'warning',
                     'category': 'budget',
                     'title': 'Approaching Budget Limit',
-                    'message': f"You've spent ${current_month_spending:.2f} of your "
-                              f"${budget.monthly_limit:.2f} monthly budget.",
+                    'message': f"You've spent ₹{current_month_spending:.2f} of your "
+                              f"₹{budget.monthly_limit:.2f} monthly budget.",
                     'recommendation': 'Limit non-essential purchases for the rest of the month.',
                     'priority': 'high'
                 })
@@ -374,7 +381,7 @@ class ComprehensiveAIService:
             insights.append({
                 'title': 'Spending Overview',
                 'text': f"Over the last {aggregation['months_analyzed']} months, you've spent "
-                       f"an average of ${avg_monthly:.2f} per month, totaling ${aggregation['overall_total']:.2f}."
+                       f"an average of ₹{avg_monthly:.2f} per month, totaling ₹{aggregation['overall_total']:.2f}."
             })
         
         # Prediction insight
@@ -382,7 +389,7 @@ class ComprehensiveAIService:
             insights.append({
                 'title': 'Next Month Forecast',
                 'text': f"Based on your spending pattern, you're likely to spend "
-                       f"${prediction['predicted_amount']:.2f} next month. "
+                       f"₹{prediction['predicted_amount']:.2f} next month. "
                        f"Your spending trend is {prediction['trend']}."
             })
         
@@ -393,7 +400,7 @@ class ComprehensiveAIService:
             insights.append({
                 'title': 'Top Spending Category',
                 'text': f"Your highest expense category is {top_category[0]} at "
-                       f"${top_category[1]:.2f} ({percentage:.1f}% of total spending)."
+                       f"₹{top_category[1]:.2f} ({percentage:.1f}% of total spending)."
             })
         
         # Anomaly insight
@@ -401,7 +408,7 @@ class ComprehensiveAIService:
             insights.append({
                 'title': 'Unusual Transactions',
                 'text': f"Found {len(anomalies['anomalies'])} unusually high transactions. "
-                       f"The threshold for normal spending is ${anomalies['threshold']:.2f}."
+                       f"The threshold for normal spending is ₹{anomalies['threshold']:.2f}."
             })
         
         # Key advice

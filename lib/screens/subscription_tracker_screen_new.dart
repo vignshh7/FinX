@@ -6,9 +6,11 @@ import '../core/theme/fintech_colors.dart';
 import '../core/theme/fintech_typography.dart';
 import '../core/widgets/fintech_components.dart';
 import '../providers/subscription_provider.dart';
+import '../providers/expense_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../models/subscription_model.dart';
+import '../models/expense_model.dart';
 
 class SubscriptionTrackerScreenNew extends StatefulWidget {
   const SubscriptionTrackerScreenNew({super.key});
@@ -423,7 +425,27 @@ class _AddSubscriptionSheetState extends State<AddSubscriptionSheet> {
 
       await Provider.of<SubscriptionProvider>(context, listen: false)
           .addSubscription(subscription);
-      
+
+      // If renewal date is today or already past, record as an expense
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final renewalDay = DateTime(
+          _selectedDate.year, _selectedDate.month, _selectedDate.day);
+      if (!renewalDay.isAfter(today)) {
+        final expenseProvider =
+            Provider.of<ExpenseProvider>(context, listen: false);
+        final expense = Expense(
+          userId: authProvider.user?.id ?? 0,
+          store: _nameController.text.trim(),
+          amount: _selectedFrequency == 'yearly'
+              ? double.parse(_amountController.text) / 12
+              : double.parse(_amountController.text),
+          category: 'Entertainment',
+          date: now,
+        );
+        await expenseProvider.addExpense(expense);
+      }
+
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(

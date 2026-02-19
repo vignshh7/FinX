@@ -8,6 +8,7 @@ import '../../core/widgets/fintech_components.dart';
 import '../../providers/expense_provider.dart';
 import '../../providers/income_provider.dart';
 import '../../providers/subscription_provider.dart';
+import '../../providers/savings_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../models/expense_model.dart';
@@ -17,6 +18,10 @@ import '../expense_history_screen_new.dart';
 import '../modern_ai_insights_screen_new.dart';
 import '../subscription_tracker_screen_new.dart';
 import '../income_tracking_screen_new.dart';
+import '../budget_management_screen.dart';
+import '../savings_goals_screen.dart';
+import '../bill_reminders_screen.dart';
+import '../data_management_screen.dart';
 import '../settings_screen.dart';
 
 class ModernDashboardScreen extends StatefulWidget {
@@ -40,12 +45,14 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
     final expenseProvider = Provider.of<ExpenseProvider>(context, listen: false);
     final incomeProvider = Provider.of<IncomeProvider>(context, listen: false);
     final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+    final savingsProvider = Provider.of<SavingsProvider>(context, listen: false);
     
     try {
       await Future.wait([
         expenseProvider.fetchExpenses(),
         incomeProvider.fetchIncomes(),
         subscriptionProvider.fetchSubscriptions(),
+        savingsProvider.fetchSavingsGoals(),
         expenseProvider.fetchPrediction(),
         expenseProvider.fetchAlerts(),
       ]);
@@ -63,6 +70,7 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
     final expenseProvider = Provider.of<ExpenseProvider>(context);
     final incomeProvider = Provider.of<IncomeProvider>(context);
     final subscriptionProvider = Provider.of<SubscriptionProvider>(context);
+    final savingsProvider = Provider.of<SavingsProvider>(context);
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     final theme = Theme.of(context);
@@ -161,6 +169,7 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
                         expenseProvider,
                         incomeProvider,
                         subscriptionProvider,
+                        savingsProvider,
                         currencyFormat,
                       ),
                     ),
@@ -179,6 +188,7 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
     ExpenseProvider expenseProvider,
     IncomeProvider incomeProvider,
     SubscriptionProvider subscriptionProvider,
+    SavingsProvider savingsProvider,
     NumberFormat currencyFormat,
   ) {
     return Column(
@@ -189,6 +199,7 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
           expenseProvider,
           incomeProvider,
           subscriptionProvider,
+          savingsProvider,
           currencyFormat,
         ),
         
@@ -229,15 +240,17 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
     ExpenseProvider expenseProvider,
     IncomeProvider incomeProvider,
     SubscriptionProvider subscriptionProvider,
+    SavingsProvider savingsProvider,
     NumberFormat currencyFormat,
   ) {
     final monthlySpent = expenseProvider.monthlyTotal;
     final monthlyIncome = incomeProvider.monthlyTotal;
     final subscriptionCost = subscriptionProvider.totalMonthlyCost;
+    final savingsContributed = savingsProvider.monthlyContributedAmount;
     
     // Calculate budget based on income or use default
     final budget = monthlyIncome > 0 ? monthlyIncome : 5000.0;
-    final remaining = monthlyIncome - monthlySpent - subscriptionCost;
+    final remaining = monthlyIncome - monthlySpent - subscriptionCost - savingsContributed;
     final spentPercentage = budget > 0 ? (monthlySpent / budget).clamp(0.0, 1.0) : 0.0;
     final netSavings = monthlyIncome - monthlySpent;
 
@@ -281,6 +294,26 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
                     color: Colors.white.withOpacity(0.8),
                   ),
                 ),
+                if (savingsContributed > 0) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.savings_outlined,
+                        size: 12,
+                        color: Colors.white.withOpacity(0.65),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${currencyFormat.format(savingsContributed)} to savings',
+                        style: FintechTypography.bodySmall.copyWith(
+                          color: Colors.white.withOpacity(0.65),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 16),
                 // Progress bar
                 LinearProgressIndicator(
@@ -407,6 +440,32 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
               iconColor: FintechColors.primaryPurple,
             ),
           ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 110,
+            child: QuickActionCard(
+              icon: Icons.account_balance_wallet_outlined,
+              label: 'Budget',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BudgetManagementScreen()),
+              ),
+              iconColor: FintechColors.accentGreen,
+            ),
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 110,
+            child: QuickActionCard(
+              icon: Icons.savings_outlined,
+              label: 'Savings',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SavingsGoalsScreen()),
+              ),
+              iconColor: const Color(0xFF9C27B0),
+            ),
+          ),
         ],
       ),
     );
@@ -440,12 +499,36 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
           ),
           const SizedBox(height: 12),
           FeatureCard(
-            icon: Icons.savings_outlined,
-            title: 'Budget Planning',
+            icon: Icons.account_balance_wallet_outlined,
+            title: 'Budget Management',
             subtitle: 'Set and track spending limits',
-            onTap: () {},
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BudgetManagementScreen()),
+            ),
             iconColor: FintechColors.accentGreen,
-            isComingSoon: true,
+          ),
+          const SizedBox(height: 12),
+          FeatureCard(
+            icon: Icons.savings_outlined,
+            title: 'Savings Goals',
+            subtitle: 'Track your financial goals',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SavingsGoalsScreen()),
+            ),
+            iconColor: const Color(0xFF9C27B0),
+          ),
+          const SizedBox(height: 12),
+          FeatureCard(
+            icon: Icons.notifications_active_outlined,
+            title: 'Bill Management',
+            subtitle: 'Never miss a payment',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BillRemindersScreen()),
+            ),
+            iconColor: FintechColors.accentOrange,
           ),
         ],
       ),
@@ -493,9 +576,12 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
         children: [
           FeatureCard(
             icon: Icons.cloud_upload_outlined,
-            title: 'Export Data',
-            subtitle: 'Backup and export your data',
-            onTap: () => _showExportOptions(context),
+            title: 'Data Management',
+            subtitle: 'Export, import and backup your data',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DataManagementScreen()),
+            ),
             iconColor: FintechColors.infoColor,
           ),
           const SizedBox(height: 12),
@@ -584,54 +670,6 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => const _AddExpenseSheet(),
-    );
-  }
-
-  void _showExportOptions(BuildContext context) {
-    final theme = Theme.of(context);
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: theme.colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Export Data',
-              style: FintechTypography.h4.copyWith(color: theme.colorScheme.onSurface),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: Icon(Icons.table_chart, color: FintechColors.infoColor),
-              title: const Text('Export as CSV'),
-              subtitle: const Text('Export all data to CSV format'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('CSV export coming soon')),
-                );
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.picture_as_pdf, color: FintechColors.errorColor),
-              title: const Text('Export as PDF'),
-              subtitle: const Text('Generate PDF report'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('PDF export coming soon')),
-                );
-              },
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
     );
   }
 
