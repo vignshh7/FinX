@@ -13,6 +13,7 @@ import '../providers/budget_provider.dart';
 import '../providers/savings_provider.dart';
 import '../providers/bill_reminder_provider.dart';
 import '../services/export_import_service.dart';
+import '../services/api_service.dart';
 
 class DataManagementScreen extends StatefulWidget {
   const DataManagementScreen({super.key});
@@ -731,17 +732,78 @@ class _DataManagementScreenState extends State<DataManagementScreen>
         return;
       }
 
-      // Process imported data
+      final apiService = ApiService();
       int totalImported = 0;
+      int totalFailed = 0;
+      final importedByType = <String, int>{
+        'expenses': 0,
+        'income': 0,
+        'budgets': 0,
+        'savings': 0,
+        'bills': 0,
+      };
 
-      // Import expenses
-      if (importData['expenses'] != null) {
-        // In a real app, you would call API endpoints to import data
-        totalImported += (importData['expenses'] as List).length;
+      Future<void> importList(
+        String key,
+        Map<String, dynamic>? Function(Map<String, dynamic>) normalize,
+        Future<void> Function(Map<String, dynamic>) upload,
+      ) async {
+        final list = importData[key];
+        if (list is! List) return;
+
+        for (final item in list) {
+          if (item is! Map) {
+            totalFailed++;
+            continue;
+          }
+
+          final raw = Map<String, dynamic>.from(item);
+          final payload = normalize(raw);
+          if (payload == null) {
+            totalFailed++;
+            continue;
+          }
+
+          try {
+            await upload(payload);
+            totalImported++;
+            importedByType[key] = (importedByType[key] ?? 0) + 1;
+          } catch (e) {
+            totalFailed++;
+            debugPrint('Import failed for $key record: $e');
+          }
+        }
       }
 
-      // Import other data types...
-      // Similar pattern for income, budgets, savings, bills
+      await importList(
+        'expenses',
+        _normalizeExpensePayload,
+        (payload) => apiService.addExpense(payload),
+      );
+
+      await importList(
+        'income',
+        _normalizeIncomePayload,
+        (payload) => apiService.addIncome(payload),
+      );
+
+      await importList(
+        'budgets',
+        _normalizeBudgetPayload,
+        (payload) => apiService.createBudget(payload),
+      );
+
+      await importList(
+        'savings',
+        _normalizeSavingsPayload,
+        (payload) => apiService.createSavingsGoal(payload),
+      );
+
+      await importList(
+        'bills',
+        _normalizeBillPayload,
+        (payload) => apiService.createBillReminder(payload),
+      );
 
       // Refresh all providers
       if (mounted) {
@@ -752,18 +814,27 @@ class _DataManagementScreenState extends State<DataManagementScreen>
         final billProvider = Provider.of<BillReminderProvider>(context, listen: false);
 
         await Future.wait([
-          expenseProvider.fetchExpenses(),
-          incomeProvider.fetchIncomes(),
+          expenseProvider.fetchExpenses(forceRefresh: true),
+          incomeProvider.fetchIncomes(forceRefresh: true),
           budgetProvider.fetchBudgets(),
           savingsProvider.fetchSavingsGoals(),
-          billProvider.fetchBillReminders(),
+          billProvider.fetchBillReminders(forceRefresh: true),
         ]);
       }
 
+      final breakdown = importedByType.entries
+          .where((e) => e.value > 0)
+          .map((e) => '${e.key}: ${e.value}')
+          .join(', ');
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Successfully imported $totalImported records'),
-          backgroundColor: FintechColors.successColor,
+          content: Text(
+            totalFailed > 0
+                ? 'Imported $totalImported records, failed $totalFailed${breakdown.isNotEmpty ? ' ($breakdown)' : ''}'
+                : 'Successfully imported $totalImported records${breakdown.isNotEmpty ? ' ($breakdown)' : ''}',
+          ),
+          backgroundColor: totalFailed > 0 ? FintechColors.warningColor : FintechColors.successColor,
         ),
       );
     } catch (e) {
@@ -778,6 +849,181 @@ class _DataManagementScreenState extends State<DataManagementScreen>
         _isImporting = false;
       });
     }
+  }
+
+  Map<String, dynamic>? _normalizeExpensePayload(Map<String, dynamic> raw) {
+    final amount = _toNumber(raw['amount']);
+    final date = _toIsoDate(raw['date']);
+    final store = _toText(raw['store']) ?? _toText(raw['description']) ?? 'Imported Expense';
+    final category = _toText(raw['category']) ?? 'Other';
+
+    if (amount == null || amount <= 0 || date == null) {
+      return null;
+    }
+
+    final payload = <String, dynamic>{
+      'store': store,
+      'amount': amount,
+      'category': category,
+      'date': date,
+    };
+
+    final items = _toStringList(raw['items']);
+    if (items != null && items.isNotEmpty) {
+      payload['items'] = items;
+    }
+
+    final rawText = _toText(raw['raw_ocr_text']);
+    if (rawText != null) {
+      payload['raw_ocr_text'] = rawText;
+    }
+
+    return payload;
+  }
+
+  Map<String, dynamic>? _normalizeIncomePayload(Map<String, dynamic> raw) {
+    final amount = _toNumber(raw['amount']);
+    final date = _toIsoDate(raw['date']);
+    final source = _toText(raw['source']) ?? _toText(raw['description']) ?? 'Imported Income';
+
+    if (amount == null || amount <= 0 || date == null) {
+      return null;
+    }
+
+    return {
+      'source': source,
+      'amount': amount,
+      'date': date,
+      'category': _toText(raw['category']) ?? 'Other',
+      'currency': (_toText(raw['currency']) ?? 'INR').toUpperCase(),
+      'is_recurring': _toBool(raw['is_recurring']),
+      if (_toText(raw['notes']) != null) 'notes': _toText(raw['notes']),
+    };
+  }
+
+  Map<String, dynamic>? _normalizeBudgetPayload(Map<String, dynamic> raw) {
+    final amount = _toNumber(raw['amount']);
+    final category = _toText(raw['category']);
+
+    if (amount == null || amount <= 0 || category == null) {
+      return null;
+    }
+
+    return {
+      'category': category,
+      'amount': amount,
+    };
+  }
+
+  Map<String, dynamic>? _normalizeSavingsPayload(Map<String, dynamic> raw) {
+    final targetAmount = _toNumber(raw['target_amount'] ?? raw['amount']);
+    final title = _toText(raw['title']) ?? _toText(raw['name']) ?? 'Imported Goal';
+
+    if (targetAmount == null || targetAmount <= 0) {
+      return null;
+    }
+
+    final payload = <String, dynamic>{
+      'title': title,
+      'target_amount': targetAmount,
+      'current_amount': _toNumber(raw['current_amount']) ?? 0.0,
+      'is_completed': _toBool(raw['is_completed']),
+      'priority': _toText(raw['priority']) ?? 'medium',
+    };
+
+    final description = _toText(raw['description']);
+    if (description != null) {
+      payload['description'] = description;
+    }
+
+    final category = _toText(raw['category']);
+    if (category != null) {
+      payload['category'] = category;
+    }
+
+    final targetDate = _toIsoDate(raw['target_date']);
+    if (targetDate != null) {
+      payload['target_date'] = targetDate;
+    }
+
+    return payload;
+  }
+
+  Map<String, dynamic>? _normalizeBillPayload(Map<String, dynamic> raw) {
+    final amount = _toNumber(raw['amount']);
+    final dueDate = _toIsoDate(raw['due_date'] ?? raw['date']);
+    final title = _toText(raw['title']) ?? _toText(raw['name']) ?? 'Imported Bill';
+
+    if (amount == null || amount <= 0 || dueDate == null) {
+      return null;
+    }
+
+    return {
+      'title': title,
+      'amount': amount,
+      'due_date': dueDate,
+      'description': _toText(raw['description']),
+      'frequency': _toText(raw['frequency']) ?? 'monthly',
+      'category': _toText(raw['category']) ?? 'other',
+      'priority': _toText(raw['priority']) ?? 'medium',
+      'is_recurring': _toBool(raw['is_recurring']),
+      'is_paid': _toBool(raw['is_paid']),
+      'status': _toText(raw['status']) ?? 'pending',
+      'currency': (_toText(raw['currency']) ?? 'USD').toUpperCase(),
+    };
+  }
+
+  String? _toText(dynamic value) {
+    if (value == null) return null;
+    final text = value.toString().trim();
+    return text.isEmpty ? null : text;
+  }
+
+  double? _toNumber(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString().trim());
+  }
+
+  bool _toBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      return normalized == 'true' || normalized == '1' || normalized == 'yes';
+    }
+    return false;
+  }
+
+  List<String>? _toStringList(dynamic value) {
+    if (value is! List) return null;
+    final items = value
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    return items;
+  }
+
+  String? _toIsoDate(dynamic value) {
+    if (value == null) return null;
+
+    if (value is int || value is double) {
+      final n = (value as num).toDouble();
+      final milliseconds = n > 9999999999 ? n.toInt() : (n * 1000).toInt();
+      return DateTime.fromMillisecondsSinceEpoch(milliseconds).toIso8601String();
+    }
+
+    if (value is String) {
+      final raw = value.trim();
+      if (raw.isEmpty) return null;
+      final normalized = raw.contains(' ') ? raw.replaceFirst(' ', 'T') : raw;
+      final parsed = DateTime.tryParse(normalized);
+      if (parsed != null) {
+        return parsed.toIso8601String();
+      }
+    }
+
+    return null;
   }
 
   void _showClearDataDialog() {
