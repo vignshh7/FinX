@@ -8,11 +8,94 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.services.comprehensive_ai_service import ComprehensiveAIService
 from app.models import Expense, CategorizationFeedback
+import os
+import json
+import requests
 
 ai_bp = Blueprint('ai', __name__)
 
 # Initialize AI service
 ai_service = ComprehensiveAIService(db)
+
+
+def _generate_llm_insights(user_id):
+    api_key = os.getenv('GROQ_API_KEY')
+    if not api_key:
+        return None
+
+    try:
+        analysis = ai_service.get_complete_ai_analysis(user_id)
+        aggregation = analysis.get('aggregation', {}) or {}
+        prediction = analysis.get('prediction', {}) or {}
+        anomalies_data = analysis.get('anomalies', {}) or {}
+        advice = analysis.get('advice', {}).get('advice', []) or []
+
+        monthly_totals = aggregation.get('monthly_totals', {}) or {}
+        category_totals = aggregation.get('category_totals', {}) or {}
+        top_categories = sorted(
+            category_totals.items(), key=lambda x: x[1], reverse=True
+        )[:5]
+        recent_months = sorted(monthly_totals.items())[-6:]
+
+        # Compact, safe data summary to avoid oversized prompts
+        data_summary = (
+            f"Monthly spending (recent): {recent_months}\n"
+            f"Top categories: {top_categories}\n"
+            f"Overall total: {round(aggregation.get('overall_total', 0), 2)}\n"
+            f"Avg monthly: {round(aggregation.get('average_monthly', 0), 2)}\n"
+            f"Next month prediction: {round(float(prediction.get('next_month_prediction', 0) or 0), 2)}\n"
+            f"Spending trend: {prediction.get('trend', 'unknown')}\n"
+            f"Anomalies detected: {len(anomalies_data.get('anomalies', []))}\n"
+            f"Top advice: {[a.get('title', '') for a in advice[:3]]}"
+        )
+
+        payload = {
+            'model': os.getenv('GROQ_MODEL', 'llama-3.1-8b-instant'),
+            'messages': [
+                {
+                    'role': 'system',
+                    'content': (
+                        'You are a financial insights assistant. Return ONLY valid JSON with keys: '
+                        'summary (string), highlights (array of strings), risks (array of strings), '
+                        'actions (array of strings), sections (object with keys: prediction, aggregation, '
+                        'anomalies, advice, patterns — each having summary (string) and bullets (array of strings)).'
+                    )
+                },
+                {
+                    'role': 'user',
+                    'content': f'Generate insights for this financial data:\n{data_summary}'
+                }
+            ],
+            'temperature': 0.3,
+            'max_tokens': 600,
+            'response_format': {'type': 'json_object'},
+        }
+
+        response = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json',
+            },
+            json=payload,
+            timeout=25,
+        )
+        response.raise_for_status()
+        data = response.json()
+        content = data.get('choices', [{}])[0].get('message', {}).get('content', '')
+
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            return {
+                'summary': content.strip(),
+                'highlights': [], 'risks': [], 'actions': [],
+            }
+    except Exception as e:
+        return {
+            'summary': f'LLM insights unavailable: {str(e)}',
+            'highlights': [], 'risks': [], 'actions': [],
+        }
 
 
 @ai_bp.route('/ai/categorize', methods=['POST'])
@@ -133,7 +216,11 @@ def get_insights_route():
         user_id = get_jwt_identity()
         
         insights = ai_service.generate_insights_text(user_id)
-        
+        llm_insights = _generate_llm_insights(user_id)
+
+        insights['llm'] = llm_insights
+        insights['llm_enabled'] = llm_insights is not None and 'summary' in llm_insights
+
         return jsonify(insights), 200
         
     except Exception as e:

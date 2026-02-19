@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ThemeProvider with ChangeNotifier {
   bool _isDarkMode = true; // Default to dark mode ON
-  String _currency = 'USD';
+  String _currency = 'INR';
   double _monthlyBudget = 5000.0; // Default budget
   bool _isInitialized = false;
   
@@ -39,7 +39,7 @@ class ThemeProvider with ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       _isDarkMode = prefs.getBool('isDarkMode') ?? true; // Default to dark
-      _currency = prefs.getString('currency') ?? 'USD';
+      _currency = prefs.getString('currency') ?? 'INR';
       _monthlyBudget = prefs.getDouble('monthlyBudget') ?? 5000.0;
       _isInitialized = true;
       if (kDebugMode) {

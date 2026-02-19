@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../core/theme/fintech_colors.dart';
 import '../core/theme/fintech_typography.dart';
 import '../providers/expense_provider.dart';
@@ -15,6 +17,7 @@ class ModernAIInsightsScreen extends StatefulWidget {
 class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
   bool _isLoading = true;
 
   @override
@@ -23,6 +26,10 @@ class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
     );
     _loadAIInsights();
   }
@@ -39,19 +46,15 @@ class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
     try {
       final expenseProvider = Provider.of<ExpenseProvider>(context, listen: false);
       
-      // Fetch all AI-related data
-      await Future.wait([
-        expenseProvider.fetchExpenses(),
-        expenseProvider.fetchPrediction(),
-        expenseProvider.fetchAlerts(),
-      ]);
+      // Fetch all comprehensive AI data
+      await expenseProvider.loadAllAIData(forceRefresh: true);
       
       _animationController.forward();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading insights: ${e.toString()}'),
+            content: Text('Error loading AI insights: ${e.toString()}'),
             backgroundColor: FintechColors.errorColor,
           ),
         );
@@ -80,28 +83,41 @@ class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
                 color: FintechColors.primaryColor,
                 child: Consumer<ExpenseProvider>(
                   builder: (context, expenseProvider, _) {
-                    return CustomScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      slivers: [
-                        _buildAppBar(isDark),
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-                          sliver: SliverList(
-                            delegate: SliverChildListDelegate([
-                              _buildPredictionCard(expenseProvider, isDark),
-                              const SizedBox(height: 20),
-                              _buildAlertsSection(expenseProvider, isDark),
-                              const SizedBox(height: 20),
-                              _buildSpendingAnalysis(expenseProvider, isDark),
-                              const SizedBox(height: 20),
-                              _buildCategoryBreakdown(expenseProvider, isDark),
-                              const SizedBox(height: 20),
-                              _buildRecommendations(expenseProvider, isDark),
-                              SizedBox(height: bottomPadding + 100),
-                            ]),
+                    return FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: CustomScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        slivers: [
+                          _buildAppBar(isDark),
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                            sliver: SliverList(
+                              delegate: SliverChildListDelegate([
+                                _buildPredictionCard(expenseProvider, isDark),
+                                const SizedBox(height: 20),
+                                _buildMonthlyComparisonCard(expenseProvider, isDark),
+                                const SizedBox(height: 20),
+                                _buildCompleteAIAnalysisSection(expenseProvider, isDark),
+                                const SizedBox(height: 20),
+                                _buildFinancialAdviceSection(expenseProvider, isDark),
+                                const SizedBox(height: 20),
+                                _buildAlertsSection(expenseProvider, isDark),
+                                const SizedBox(height: 20),
+                                _buildSpendingAggregationSection(expenseProvider, isDark),
+                                const SizedBox(height: 20),
+                                _buildSpendingAnalysis(expenseProvider, isDark),
+                                const SizedBox(height: 20),
+                                _buildCategoryBreakdown(expenseProvider, isDark),
+                                const SizedBox(height: 20),
+                                _buildEnhancedAIInsightsSection(expenseProvider, isDark),
+                                const SizedBox(height: 20),
+                                _buildRecommendations(expenseProvider, isDark),
+                                SizedBox(height: bottomPadding + 100),
+                              ]),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     );
                   },
                 ),
@@ -146,7 +162,7 @@ class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
             fontWeight: FontWeight.w700,
           ),
         ),
-        titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
+        titlePadding: const EdgeInsets.only(left: 56, bottom: 16),
       ),
       actions: [
         IconButton(
@@ -174,10 +190,16 @@ class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
     final themeProvider = Provider.of<ThemeProvider>(context);
     final currencySymbol = themeProvider.currencySymbol;
 
-    final nextMonthPrediction = prediction['next_month_prediction'] ?? 0.0;
-    final confidence = prediction['confidence'] ?? 0.0;
+    final _rawPrediction = prediction['next_month_prediction'] ?? prediction['predicted_amount'] ?? 0.0;
+    final nextMonthPrediction = (_rawPrediction is num) ? _rawPrediction.toDouble() : 0.0;
+    final _rawConfidence = prediction['confidence'] ?? 0.0;
+    final confidence = (_rawConfidence is num) ? _rawConfidence.toDouble() : 0.0;
     final trend = prediction['trend'] ?? 'stable';
     
+    final llmSections = provider.aiInsights is Map
+        ? (provider.aiInsights?['llm']?['sections'] as Map?)
+        : null;
+
     return FadeTransition(
       opacity: _animationController,
       child: Container(
@@ -238,6 +260,10 @@ class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
                           color: Colors.white.withOpacity(0.9),
                         ),
                       ),
+                      if (llmSections != null) ...[
+                        const SizedBox(height: 16),
+                        _buildSectionLlmInsight(llmSections, 'prediction', isDark),
+                      ],
                     ],
                   ),
                 ),
@@ -294,8 +320,142 @@ class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
     );
   }
 
+  Widget _buildMonthlyComparisonCard(ExpenseProvider provider, bool isDark) {
+    final comparison = provider.getSpendingComparison();
+    final current = (comparison['currentMonth'] as num?)?.toDouble() ?? 0.0;
+    final past = (comparison['pastMonth'] as num?)?.toDouble() ?? 0.0;
+    final difference = (comparison['difference'] as num?)?.toDouble() ?? 0.0;
+    final percentage = (comparison['percentageChange'] as num?)?.toDouble() ?? 0.0;
+    final isIncreasing = comparison['isIncreasing'] == true;
+
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final currencySymbol = themeProvider.currencySymbol;
+    final total = current + past;
+    final currentRatio = total > 0 ? (current / total).clamp(0.0, 1.0) : 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? FintechColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? FintechColors.borderColor : FintechColors.lightBorderColor,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.compare_arrows,
+                color: FintechColors.accentTeal,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Monthly Comparison',
+                style: FintechTypography.h5.copyWith(
+                  color: isDark ? FintechColors.textPrimary : FintechColors.lightTextPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildComparisonStat(
+                  'This Month',
+                  '$currencySymbol${current.toStringAsFixed(2)}',
+                  FintechColors.accentTeal,
+                  isDark,
+                ),
+              ),
+              Expanded(
+                child: _buildComparisonStat(
+                  'Past Month',
+                  '$currencySymbol${past.toStringAsFixed(2)}',
+                  FintechColors.textSecondary,
+                  isDark,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: currentRatio,
+              minHeight: 8,
+              backgroundColor: isDark
+                  ? FintechColors.borderColor
+                  : FintechColors.lightBorderColor,
+              valueColor: AlwaysStoppedAnimation<Color>(FintechColors.accentTeal),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(
+                isIncreasing ? Icons.trending_up : Icons.trending_down,
+                color: isIncreasing ? FintechColors.errorColor : FintechColors.successColor,
+                size: 18,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  percentage.abs() < 1
+                      ? 'Similar to last month'
+                      : '${percentage.abs().toStringAsFixed(1)}% ${isIncreasing ? 'increase' : 'decrease'}',
+                  style: FintechTypography.bodySmall.copyWith(
+                    color: isIncreasing ? FintechColors.errorColor : FintechColors.successColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                '${difference >= 0 ? '+' : '-'}$currencySymbol${difference.abs().toStringAsFixed(2)}',
+                style: FintechTypography.bodySmall.copyWith(
+                  color: isIncreasing ? FintechColors.errorColor : FintechColors.successColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildComparisonStat(String label, String value, Color color, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: FintechTypography.caption.copyWith(
+            color: isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: FintechTypography.h5.copyWith(
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildAlertsSection(ExpenseProvider provider, bool isDark) {
     final alerts = provider.alerts;
+    final llmSections = provider.aiInsights is Map
+        ? (provider.aiInsights?['llm']?['sections'] as Map?)
+        : null;
     
     if (alerts.isEmpty) {
       return _buildEmptyCard(
@@ -364,6 +524,12 @@ class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
                 ],
               ),
             ),
+            if (llmSections != null) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: _buildSectionLlmInsight(llmSections, 'anomalies', isDark),
+              ),
+            ],
             const Divider(height: 1),
             ListView.separated(
               shrinkWrap: true,
@@ -383,20 +549,32 @@ class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
 
   Widget _buildAlertItem(dynamic alert, bool isDark) {
     final type = alert['type'] ?? 'info';
-    final message = alert['message'] ?? 'No message';
-    final category = alert['category'];
-    
+    final title = alert['title']?.toString();
+    final message = alert['message']?.toString() ?? 'No message';
+    final recommendation = alert['recommendation']?.toString();
+    final category = alert['category']?.toString();
+    final priority = alert['priority']?.toString();
+
     IconData icon;
     Color color;
-    
+
     switch (type) {
       case 'warning':
         icon = Icons.warning_rounded;
         color = FintechColors.warningColor;
         break;
       case 'critical':
+      case 'alert':
         icon = Icons.error_rounded;
         color = FintechColors.errorColor;
+        break;
+      case 'positive':
+        icon = Icons.check_circle_rounded;
+        color = FintechColors.successColor;
+        break;
+      case 'suggestion':
+        icon = Icons.tips_and_updates;
+        color = FintechColors.infoColor;
         break;
       default:
         icon = Icons.info_rounded;
@@ -421,17 +599,34 @@ class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (category != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      category,
-                      style: FintechTypography.caption.copyWith(
-                        color: color,
-                        fontWeight: FontWeight.w600,
+                Row(
+                  children: [
+                    if (title != null)
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: FintechTypography.bodySmall.copyWith(
+                            color: color,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
+                    if (priority != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          priority.toUpperCase(),
+                          style: FintechTypography.caption.copyWith(
+                            color: color, fontSize: 9, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                  ],
+                ),
+                if (title != null) const SizedBox(height: 4),
                 Text(
                   message,
                   style: FintechTypography.bodySmall.copyWith(
@@ -439,6 +634,18 @@ class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
                     height: 1.4,
                   ),
                 ),
+                if (recommendation != null) ...
+                  [
+                    const SizedBox(height: 6),
+                    Text(
+                      '→ $recommendation',
+                      style: FintechTypography.caption.copyWith(
+                        color: color,
+                        fontStyle: FontStyle.italic,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
               ],
             ),
           ),
@@ -459,14 +666,18 @@ class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
         .where((e) => e.date.isAfter(lastMonth) && e.date.isBefore(currentMonth))
         .toList();
 
-    final currentTotal = currentMonthExpenses.fold<double>(0, (sum, e) => sum + e.amount);
-    final lastTotal = lastMonthExpenses.fold<double>(0, (sum, e) => sum + e.amount);
+    final currentTotal = currentMonthExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
+    final lastTotal = lastMonthExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
     
     final change = currentTotal - lastTotal;
     final changePercent = lastTotal > 0 ? (change / lastTotal) * 100 : 0.0;
     
     final themeProvider = Provider.of<ThemeProvider>(context);
     final currencySymbol = themeProvider.currencySymbol;
+
+    final llmSections = provider.aiInsights is Map
+        ? (provider.aiInsights?['llm']?['sections'] as Map?)
+        : null;
 
     return ScaleTransition(
       scale: CurvedAnimation(
@@ -567,6 +778,10 @@ class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
                             fontWeight: FontWeight.w600,
                           ),
                         ),
+                        if (llmSections != null) ...[
+                          const SizedBox(height: 12),
+                          _buildSectionLlmInsight(llmSections, 'patterns', isDark),
+                        ],
                       ],
                     ),
                   ),
@@ -634,7 +849,7 @@ class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
       ..sort((a, b) => b.value.compareTo(a.value));
     
     final topCategories = sortedCategories.take(5).toList();
-    final totalSpending = categoryTotals.values.fold<double>(0, (sum, amount) => sum + amount);
+    final totalSpending = categoryTotals.values.fold<double>(0.0, (sum, amount) => sum + amount);
     
     final themeProvider = Provider.of<ThemeProvider>(context);
     final currencySymbol = themeProvider.currencySymbol;
@@ -676,7 +891,7 @@ class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
             ),
             const SizedBox(height: 20),
             ...topCategories.map((entry) {
-              final percentage = (entry.value / totalSpending) * 100;
+              final percentage = (entry.value / (totalSpending > 0 ? totalSpending : 1.0)) * 100;
               return _buildCategoryItem(
                 entry.key,
                 entry.value,
@@ -921,55 +1136,109 @@ class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
     final categoryTotals = provider.categoryTotals;
     final monthlyTotal = provider.monthlyTotal;
 
-    // High spending alert
-    if (monthlyTotal > 3000) {
+    if (monthlyTotal <= 0) return recommendations;
+
+    // Find top spending category
+    MapEntry<String, double>? topCat;
+    if (categoryTotals.isNotEmpty) {
+      topCat = categoryTotals.entries.reduce((a, b) => a.value > b.value ? a : b);
+    }
+
+    // High spending: top category > 40% of total
+    if (topCat != null && topCat.value / monthlyTotal > 0.40) {
       recommendations.add({
         'icon': Icons.warning_rounded,
-        'title': 'High Monthly Spending',
-        'description': 'Your spending is above average. Review your expenses and set category budgets.',
+        'title': '${topCat.key} is Your Biggest Expense',
+        'description': '${topCat.key} takes ${(topCat.value / monthlyTotal * 100).toStringAsFixed(1)}% of your monthly spend (${topCat.value.toStringAsFixed(0)}). Consider ways to reduce it.',
         'color': FintechColors.errorColor,
       });
     }
 
-    // Food spending
-    if (categoryTotals['Food'] != null && categoryTotals['Food']! > 500) {
+    // Food-specific tip
+    final foodKey = categoryTotals.keys.firstWhere(
+        (k) => k.toLowerCase().contains('food') || k.toLowerCase().contains('dining'),
+        orElse: () => '');
+    if (foodKey.isNotEmpty && categoryTotals[foodKey]! / monthlyTotal > 0.25) {
       recommendations.add({
         'icon': Icons.restaurant_rounded,
         'title': 'Reduce Food Costs',
-        'description': 'Consider meal planning and cooking at home to save on food expenses.',
+        'description': 'Food & dining is ${(categoryTotals[foodKey]! / monthlyTotal * 100).toStringAsFixed(0)}% of spending. Meal planning and home cooking can cut this significantly.',
         'color': FintechColors.warningColor,
       });
     }
 
-    // Shopping recommendation
-    if (categoryTotals['Shopping'] != null && categoryTotals['Shopping']! > 400) {
+    // Shopping-specific tip
+    final shopKey = categoryTotals.keys.firstWhere(
+        (k) => k.toLowerCase().contains('shop') || k.toLowerCase().contains('retail'),
+        orElse: () => '');
+    if (shopKey.isNotEmpty && categoryTotals[shopKey]! / monthlyTotal > 0.20) {
       recommendations.add({
         'icon': Icons.shopping_bag_rounded,
-        'title': 'Control Shopping',
-        'description': 'Try the 24-hour rule: wait a day before making non-essential purchases.',
+        'title': 'Review Shopping Habits',
+        'description': 'Shopping is ${(categoryTotals[shopKey]! / monthlyTotal * 100).toStringAsFixed(0)}% of spending. Try the 24-hour rule before non-essential purchases.',
         'color': FintechColors.warningColor,
       });
     }
 
-    // Savings recommendation
-    recommendations.add({
-      'icon': Icons.savings_rounded,
-      'title': 'Build Emergency Fund',
-      'description': 'Aim to save 10-15% of your income for unexpected expenses.',
-      'color': FintechColors.successColor,
-    });
-
-    // Budget tracking
-    if (categoryTotals.length >= 3) {
+    // Many small categories — suggest consolidation
+    if (categoryTotals.length >= 5) {
       recommendations.add({
         'icon': Icons.track_changes_rounded,
         'title': 'Set Category Budgets',
-        'description': 'Define spending limits for each category to stay on track.',
+        'description': 'You spend across ${categoryTotals.length} categories. Setting per-category limits in Budget Management will help you stay on track.',
         'color': FintechColors.infoColor,
       });
     }
 
+    // Savings suggestion: use actual backend advice or generic
+    final adviceData = provider.financialAdvice;
+    final backendAdvice = adviceData != null ? (adviceData['advice'] as List? ?? []) : [];
+    final hasSavingsTip = backendAdvice.any((a) =>
+        (a['category'] ?? '').toString().contains('savings'));
+    if (!hasSavingsTip) {
+      final comparison = provider.getSpendingComparison();
+      final isDecreasing = comparison['isIncreasing'] != true;
+      recommendations.add({
+        'icon': Icons.savings_rounded,
+        'title': isDecreasing ? 'Great — Spending is Down!' : 'Build an Emergency Fund',
+        'description': isDecreasing
+            ? 'Your spending dropped vs last month. Channel those savings into an emergency fund or investments.'
+            : 'Aim to save 10–15% of your monthly income for unexpected expenses.',
+        'color': FintechColors.successColor,
+      });
+    }
+
+    // Add high-priority backend advice items as recommendations
+    for (final a in backendAdvice.take(2)) {
+      if (a is Map) {
+        recommendations.add({
+          'icon': _adviceTypeIcon(a['type']?.toString() ?? 'suggestion'),
+          'title': a['title']?.toString() ?? 'Tip',
+          'description': '${a['message'] ?? ''} ${a['recommendation'] ?? ''}'.trim(),
+          'color': _adviceTypeColor(a['type']?.toString() ?? 'suggestion'),
+        });
+      }
+    }
+
     return recommendations;
+  }
+
+  IconData _adviceTypeIcon(String type) {
+    switch (type) {
+      case 'warning': return Icons.warning_rounded;
+      case 'alert': return Icons.error_rounded;
+      case 'positive': return Icons.thumb_up_rounded;
+      default: return Icons.tips_and_updates;
+    }
+  }
+
+  Color _adviceTypeColor(String type) {
+    switch (type) {
+      case 'warning': return FintechColors.warningColor;
+      case 'alert': return FintechColors.errorColor;
+      case 'positive': return FintechColors.successColor;
+      default: return FintechColors.infoColor;
+    }
   }
 
   Color _getCategoryColor(String category) {
@@ -1008,5 +1277,1131 @@ class _ModernAIInsightsScreenState extends State<ModernAIInsightsScreen>
       default:
         return Icons.category;
     }
+  }
+
+  // =================================
+  // NEW COMPREHENSIVE AI SECTIONS
+  // =================================
+
+  Widget _buildCompleteAIAnalysisSection(ExpenseProvider provider, bool isDark) {
+    final analysis = provider.completeAIAnalysis;
+
+    if (analysis == null) {
+      return _buildEmptyCard(
+        'Complete AI Analysis',
+        'Loading comprehensive financial analysis...',
+        Icons.psychology,
+        isDark,
+      );
+    }
+
+    // Extract fields from the backend response
+    final prediction = analysis['prediction'] is Map ? analysis['prediction'] as Map : null;
+    final aggregation = analysis['aggregation'] is Map ? analysis['aggregation'] as Map : null;
+    // anomalies key is a Map with an inner 'anomalies' list
+    final anomaliesMap = analysis['anomalies'] is Map ? analysis['anomalies'] as Map : null;
+    final anomalyList = anomaliesMap?['anomalies'] is List ? anomaliesMap!['anomalies'] as List : <dynamic>[];
+    final advice = analysis['advice'] is Map ? analysis['advice'] as Map : null;
+    final insightsMap = analysis['insights'] is Map ? analysis['insights'] as Map : null;
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final cur = themeProvider.currencySymbol;
+
+    // Build summary stats
+    final predAmt = prediction != null
+        ? ((prediction['next_month_prediction'] ?? prediction['predicted_amount'] ?? 0.0) as num).toDouble()
+        : null;
+    final confidence = prediction != null
+        ? ((prediction['confidence'] ?? 0.0) as num).toDouble()
+        : null;
+    final totalCategories = aggregation?['total_categories'] as int? ??
+        (aggregation?['category_totals'] is Map ? (aggregation!['category_totals'] as Map).length : null);
+    final avgMonthly = aggregation != null
+        ? ((aggregation['average_monthly'] ?? aggregation['avg_monthly_spend'] ?? 0.0) as num).toDouble()
+        : null;
+    final anomalyCount = anomalyList.length;
+    final adviceList = advice != null
+        ? ((advice['advice'] ?? advice['recommendations'] ?? []) as List)
+        : <dynamic>[];
+    final insightTexts = insightsMap != null
+        ? ((insightsMap['insights'] ?? []) as List)
+        : <dynamic>[];
+
+    final statColor = isDark ? FintechColors.textPrimary : FintechColors.lightTextPrimary;
+    final subColor = isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary;
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? FintechColors.cardBackground : FintechColors.lightCardBackground,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: FintechColors.borderColor.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [FintechColors.primaryColor, FintechColors.primaryColor.withOpacity(0.7)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.psychology, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Complete AI Analysis',
+                        style: FintechTypography.h4.copyWith(color: statColor, fontWeight: FontWeight.bold)),
+                    Text('Full pipeline summary', style: FintechTypography.bodyMedium.copyWith(color: subColor)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Quick stat chips
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              if (predAmt != null)
+                _buildStatChip(Icons.trending_up, 'Next Month', '$cur${predAmt.toStringAsFixed(0)}',
+                    FintechColors.primaryColor, isDark),
+              if (confidence != null)
+                _buildStatChip(Icons.verified, 'Confidence', '${(confidence * 100).toStringAsFixed(0)}%',
+                    FintechColors.successColor, isDark),
+              if (avgMonthly != null)
+                _buildStatChip(Icons.calculate, 'Avg Monthly', '$cur${avgMonthly.toStringAsFixed(0)}',
+                    FintechColors.accentTeal, isDark),
+              if (totalCategories != null)
+                _buildStatChip(Icons.category, 'Categories', '$totalCategories',
+                    FintechColors.warningColor, isDark),
+              _buildStatChip(Icons.warning_rounded, 'Anomalies', '$anomalyCount',
+                  anomalyCount > 0 ? FintechColors.errorColor : FintechColors.successColor, isDark),
+            ],
+          ),
+
+          // Insights from AI
+          if (insightTexts.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Text('AI Observations',
+                style: FintechTypography.caption.copyWith(color: subColor, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            ...insightTexts.take(4).map((item) {
+              final text = item is Map ? (item['text'] ?? item.toString()) : item.toString();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.lightbulb_outline, size: 16, color: FintechColors.warningColor),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(text.toString(),
+                          style: FintechTypography.bodySmall.copyWith(color: statColor, height: 1.4)),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+
+          // Top advice
+          if (adviceList.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text('Top Recommendations',
+                style: FintechTypography.caption.copyWith(color: subColor, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            ...adviceList.take(3).map((item) {
+              final text = item is Map ? (item['message'] ?? item['advice'] ?? item.toString()) : item.toString();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.tips_and_updates, size: 16, color: FintechColors.accentTeal),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(text.toString(),
+                          style: FintechTypography.bodySmall.copyWith(color: statColor, height: 1.4)),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+
+          if (insightTexts.isEmpty && adviceList.isEmpty) ...[
+            const SizedBox(height: 12),
+            Text('No detailed insights available yet. Add more expenses to unlock AI analysis.',
+                style: FintechTypography.bodyMedium.copyWith(color: subColor, fontStyle: FontStyle.italic)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatChip(IconData icon, String label, String value, Color color, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: FintechTypography.caption.copyWith(
+                      color: isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary,
+                      fontSize: 9)),
+              Text(value,
+                  style: FintechTypography.bodySmall.copyWith(color: color, fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFinancialAdviceSection(ExpenseProvider provider, bool isDark) {
+    final advice = provider.financialAdvice;
+    
+    if (advice == null) {
+      return _buildEmptyCard(
+        'Financial Advisor',
+        'Getting personalized financial advice...',
+        Icons.lightbulb_outline,
+        isDark,
+      );
+    }
+
+    final recommendations = (advice['advice'] ?? advice['recommendations'] ?? []) as List;
+    final llmSections = provider.aiInsights is Map
+      ? (provider.aiInsights?['llm']?['sections'] as Map?)
+      : null;
+    
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? FintechColors.cardBackground : FintechColors.lightCardBackground,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: FintechColors.borderColor.withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [FintechColors.accentGreen, FintechColors.accentGreen.withOpacity(0.7)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.lightbulb_outline, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Financial Advisor',
+                      style: FintechTypography.h4.copyWith(
+                        color: isDark ? FintechColors.textPrimary : FintechColors.lightTextPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'AI-powered recommendations',
+                      style: FintechTypography.bodyMedium.copyWith(
+                        color: isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          ...recommendations.map<Widget>((rec) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildAdviceItem(rec, isDark),
+          )),
+          if (recommendations.isEmpty) 
+            Text(
+              'No specific recommendations at this time. Keep tracking your expenses!',
+              style: FintechTypography.bodyMedium.copyWith(
+                color: isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          if (llmSections != null) ...[
+            const SizedBox(height: 16),
+            _buildSectionLlmInsight(llmSections, 'advice', isDark),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpendingAggregationSection(ExpenseProvider provider, bool isDark) {
+    final aggregation = provider.spendingAggregation ?? _buildLocalAggregation(provider);
+    
+    if (aggregation == null) {
+      return _buildEmptyCard(
+        'Spending Patterns',
+        'Analyzing your spending patterns...',
+        Icons.analytics_outlined,
+        isDark,
+      );
+    }
+
+    final llmSections = provider.aiInsights is Map
+      ? (provider.aiInsights?['llm']?['sections'] as Map?)
+      : null;
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? FintechColors.cardBackground : FintechColors.lightCardBackground,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: FintechColors.borderColor.withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [FintechColors.successColor, FintechColors.successColor.withOpacity(0.7)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.analytics_outlined, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Spending Patterns',
+                      style: FintechTypography.h4.copyWith(
+                        color: isDark ? FintechColors.textPrimary : FintechColors.lightTextPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'Monthly spending trends',
+                      style: FintechTypography.bodyMedium.copyWith(
+                        color: isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          if (aggregation['monthly_totals'] != null) 
+            _buildMonthlyTotalsChart(aggregation['monthly_totals'], isDark),
+          if (aggregation['category_totals'] != null) ...[
+            const SizedBox(height: 20),
+            _buildCategoryTotalsChart(aggregation['category_totals'], isDark),
+          ],
+          const SizedBox(height: 16),
+          _buildPatternInsightsFallback(aggregation, isDark),
+          if (llmSections != null) ...[
+            const SizedBox(height: 12),
+            _buildSectionLlmInsight(llmSections, 'patterns', isDark),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Map<String, dynamic>? _buildLocalAggregation(ExpenseProvider provider) {
+    if (provider.expenses.isEmpty) return null;
+
+    final monthlyTotals = <String, double>{};
+    final categoryTotals = <String, double>{};
+    double overall = 0.0;
+
+    for (final expense in provider.expenses) {
+      final monthKey = DateFormat('yyyy-MM').format(expense.date);
+      monthlyTotals[monthKey] = (monthlyTotals[monthKey] ?? 0.0) + expense.amount;
+      categoryTotals[expense.category] = (categoryTotals[expense.category] ?? 0.0) + expense.amount;
+      overall += expense.amount;
+    }
+
+    return {
+      'monthly_totals': monthlyTotals,
+      'category_totals': categoryTotals,
+      'overall_total': overall,
+      'months_analyzed': monthlyTotals.length,
+      'average_monthly': monthlyTotals.isNotEmpty ? overall / monthlyTotals.length : 0.0,
+    };
+  }
+
+  Widget _buildEnhancedAIInsightsSection(ExpenseProvider provider, bool isDark) {
+    final insights = provider.aiInsights;
+    
+    if (insights == null) {
+      return _buildEmptyCard(
+        'AI Insights',
+        'Generating intelligent insights...',
+        Icons.auto_awesome,
+        isDark,
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? FintechColors.cardBackground : FintechColors.lightCardBackground,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: FintechColors.borderColor.withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [FintechColors.warningColor, FintechColors.warningColor.withOpacity(0.7)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.auto_awesome, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI Insights',
+                      style: FintechTypography.h4.copyWith(
+                        color: isDark ? FintechColors.textPrimary : FintechColors.lightTextPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'Smart analysis of your finances',
+                      style: FintechTypography.bodyMedium.copyWith(
+                        color: isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          if (insights['insights'] != null) ...[
+            for (final insight in insights['insights'] as List<dynamic>)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildInsightItem(insight, isDark),
+              ),
+          ],
+          if (insights['llm'] != null) ...[
+            const SizedBox(height: 16),
+            _buildLlmInsights(insights['llm'], isDark),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionLlmInsight(Map? sections, String key, bool isDark) {
+    if (sections == null || sections[key] == null) {
+      return const SizedBox.shrink();
+    }
+
+    final data = sections[key] as Map;
+    final summary = data['summary']?.toString() ?? '';
+    final bullets = data['bullets'] is List ? data['bullets'] as List : const [];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark
+            ? FintechColors.darkSurface
+            : FintechColors.lightCardBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: FintechColors.accentTeal.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (summary.isNotEmpty) ...[
+            Text(
+              summary,
+              style: FintechTypography.bodySmall.copyWith(
+                color: isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          ...bullets.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      margin: const EdgeInsets.only(top: 6),
+                      decoration: BoxDecoration(
+                        color: FintechColors.accentTeal,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        item.toString(),
+                        style: FintechTypography.bodySmall.copyWith(
+                          color: isDark ? FintechColors.textPrimary : FintechColors.lightTextPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPatternInsightsFallback(Map aggregation, bool isDark) {
+    final monthlyTotals = aggregation['monthly_totals'] is Map
+        ? Map<String, dynamic>.from(aggregation['monthly_totals'])
+        : <String, dynamic>{};
+    final categoryTotals = aggregation['category_totals'] is Map
+        ? Map<String, dynamic>.from(aggregation['category_totals'])
+        : <String, dynamic>{};
+
+    if (monthlyTotals.isEmpty && categoryTotals.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    String? topCategory;
+    double topAmount = 0.0;
+    categoryTotals.forEach((key, value) {
+      final amount = (value is num) ? value.toDouble() : 0.0;
+      if (amount > topAmount) {
+        topAmount = amount;
+        topCategory = key;
+      }
+    });
+
+    final months = monthlyTotals.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    final trend = months.length >= 2
+        ? ((months.last.value as num).toDouble() - (months.first.value as num).toDouble())
+        : 0.0;
+
+    final insights = <String>[];
+    if (topCategory != null) {
+      insights.add('Top category: $topCategory');
+    }
+    if (months.length >= 2) {
+      insights.add(trend >= 0 ? 'Spending trend is rising' : 'Spending trend is easing');
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark
+            ? FintechColors.primaryColor.withOpacity(0.08)
+            : FintechColors.primaryColor.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: FintechColors.primaryColor.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Pattern Highlights',
+            style: FintechTypography.caption.copyWith(
+              color: isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...insights.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  item,
+                  style: FintechTypography.bodySmall.copyWith(
+                    color: isDark ? FintechColors.textPrimary : FintechColors.lightTextPrimary,
+                  ),
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLlmInsights(dynamic llm, bool isDark) {
+    final summary = llm is Map ? (llm['summary']?.toString() ?? '') : llm.toString();
+    final highlights = llm is Map && llm['highlights'] is List ? llm['highlights'] as List : const [];
+    final risks = llm is Map && llm['risks'] is List ? llm['risks'] as List : const [];
+    final actions = llm is Map && llm['actions'] is List ? llm['actions'] as List : const [];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark
+            ? FintechColors.darkSurface
+            : FintechColors.lightCardBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: FintechColors.accentTeal.withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.psychology_alt,
+                color: FintechColors.accentTeal,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'LLM Summary',
+                style: FintechTypography.h6.copyWith(
+                  color: isDark ? FintechColors.textPrimary : FintechColors.lightTextPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          if (summary.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              summary,
+              style: FintechTypography.bodySmall.copyWith(
+                color: isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary,
+                height: 1.4,
+              ),
+            ),
+          ],
+          _buildLlmList('Highlights', highlights, isDark),
+          _buildLlmList('Risks', risks, isDark),
+          _buildLlmList('Actions', actions, isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLlmList(String title, List items, bool isDark) {
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: FintechTypography.caption.copyWith(
+              color: isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          ...items.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      margin: const EdgeInsets.only(top: 6),
+                      decoration: BoxDecoration(
+                        color: FintechColors.accentTeal,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        item.toString(),
+                        style: FintechTypography.bodySmall.copyWith(
+                          color: isDark ? FintechColors.textPrimary : FintechColors.lightTextPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+
+  // Helper methods for new sections
+  Widget _buildAdviceItem(dynamic advice, bool isDark) {
+    final isMap = advice is Map;
+    final type = isMap ? (advice['type']?.toString() ?? 'suggestion') : 'suggestion';
+    final title = isMap ? advice['title']?.toString() : null;
+    final message = isMap ? (advice['message']?.toString() ?? advice.toString()) : advice.toString();
+    final recommendation = isMap ? advice['recommendation']?.toString() : null;
+    final priority = isMap ? advice['priority']?.toString() : null;
+
+    final color = _adviceTypeColor(type);
+    final icon = _adviceTypeIcon(type);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.22)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.13),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    if (title != null)
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: FintechTypography.bodySmall.copyWith(
+                            color: isDark ? FintechColors.textPrimary : FintechColors.lightTextPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    if (priority != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          priority.toUpperCase(),
+                          style: FintechTypography.caption.copyWith(
+                            color: color, fontSize: 9, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                  ],
+                ),
+                if (title != null) const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: FintechTypography.bodySmall.copyWith(
+                    color: isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary,
+                    height: 1.4,
+                  ),
+                ),
+                if (recommendation != null) ...
+                  [
+                    const SizedBox(height: 5),
+                    Text(
+                      '→ $recommendation',
+                      style: FintechTypography.caption.copyWith(
+                        color: color,
+                        fontStyle: FontStyle.italic,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInsightItem(dynamic insight, bool isDark) {
+    // insight can be a String or a Map with 'title' and 'text' keys
+    String? title;
+    String text;
+    if (insight is Map) {
+      title = insight['title']?.toString();
+      text = insight['text']?.toString() ?? insight.toString();
+    } else {
+      text = insight.toString();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark 
+            ? FintechColors.primaryBlue.withOpacity(0.1)
+            : FintechColors.primaryBlue.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: FintechColors.primaryBlue.withOpacity(0.2),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.lightbulb,
+            color: FintechColors.primaryBlue,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (title != null) ...
+                  [
+                    Text(
+                      title,
+                      style: FintechTypography.bodyMedium.copyWith(
+                        color: isDark ? FintechColors.textPrimary : FintechColors.lightTextPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                Text(
+                  text,
+                  style: FintechTypography.bodyMedium.copyWith(
+                    color: isDark ? FintechColors.textPrimary : FintechColors.lightTextPrimary,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricsGrid(Map<String, dynamic> metrics, bool isDark) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.5,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+      ),
+      itemCount: metrics.keys.length > 4 ? 4 : metrics.keys.length,
+      itemBuilder: (context, index) {
+        final key = metrics.keys.elementAt(index);
+        final value = metrics[key];
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark 
+                ? FintechColors.primaryColor.withOpacity(0.1)
+                : FintechColors.primaryColor.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                value.toString(),
+                style: FintechTypography.h5.copyWith(
+                  color: FintechColors.primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                key.replaceAll('_', ' ').toUpperCase(),
+                style: FintechTypography.caption.copyWith(
+                  color: isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMonthlyTotalsChart(dynamic monthlyData, bool isDark) {
+    if (monthlyData is! Map || monthlyData.isEmpty) return const SizedBox.shrink();
+
+    final entries = monthlyData.entries
+        .map((e) => MapEntry(e.key.toString(), (e.value as num).toDouble()))
+        .toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    final recentEntries = entries.length > 6 ? entries.sublist(entries.length - 6) : entries;
+    if (recentEntries.isEmpty) return const SizedBox.shrink();
+
+    final maxVal = recentEntries.map((e) => e.value).reduce((a, b) => a > b ? a : b);
+    final barGroups = recentEntries.asMap().entries.map((e) {
+      return BarChartGroupData(
+        x: e.key,
+        barRods: [
+          BarChartRodData(
+            toY: e.value.value,
+            width: 14,
+            borderRadius: BorderRadius.circular(4),
+            gradient: LinearGradient(
+              colors: [
+                FintechColors.primaryColor,
+                FintechColors.primaryColor.withOpacity(0.6),
+              ],
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+            ),
+          ),
+        ],
+      );
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Monthly Spending Trend',
+          style: FintechTypography.caption.copyWith(
+            color: isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 140,
+          child: BarChart(
+            BarChartData(
+              maxY: maxVal * 1.2,
+              minY: 0,
+              barGroups: barGroups,
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: maxVal > 0 ? maxVal / 4 : 1,
+                getDrawingHorizontalLine: (_) => FlLine(
+                  color: FintechColors.borderColor.withOpacity(0.2),
+                  strokeWidth: 1,
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 44,
+                    interval: maxVal > 0 ? maxVal / 4 : 1,
+                    getTitlesWidget: (value, _) => Text(
+                      value >= 1000 ? '${(value / 1000).toStringAsFixed(1)}k' : value.toStringAsFixed(0),
+                      style: FintechTypography.caption.copyWith(
+                        color: isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary,
+                        fontSize: 9,
+                      ),
+                    ),
+                  ),
+                ),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 22,
+                    getTitlesWidget: (value, _) {
+                      final idx = value.toInt();
+                      if (idx < 0 || idx >= recentEntries.length) return const SizedBox.shrink();
+                      final label = recentEntries[idx].key;
+                      final parts = label.split('-');
+                      final short = parts.length == 2 ? '${parts[1]}/${parts[0].substring(2)}' : label;
+                      return Text(
+                        short,
+                        style: FintechTypography.caption.copyWith(
+                          color: isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary,
+                          fontSize: 9,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              barTouchData: BarTouchData(
+                enabled: true,
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipItem: (group, _, rod, __) => BarTooltipItem(
+                    '₹${rod.toY.toStringAsFixed(0)}',
+                    FintechTypography.caption.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryTotalsChart(dynamic categoryData, bool isDark) {
+    if (categoryData is! Map || categoryData.isEmpty) return const SizedBox.shrink();
+
+    final entries = categoryData.entries
+        .map((e) => MapEntry(e.key.toString(), (e.value as num).toDouble()))
+        .toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final top = entries.take(6).toList();
+    if (top.isEmpty) return const SizedBox.shrink();
+
+    final maxVal = top.first.value;
+    final total = top.fold<double>(0, (sum, e) => sum + e.value);
+
+    final categoryColors = [
+      FintechColors.primaryColor,
+      FintechColors.accentTeal,
+      FintechColors.successColor,
+      FintechColors.warningColor,
+      FintechColors.errorColor,
+      Colors.purple,
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Top Spending Categories',
+          style: FintechTypography.caption.copyWith(
+            color: isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ...top.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final cat = entry.value;
+          final pct = maxVal > 0 ? cat.value / maxVal : 0.0;
+          final share = total > 0 ? (cat.value / total * 100) : 0.0;
+          final color = categoryColors[idx % categoryColors.length];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        cat.key,
+                        style: FintechTypography.bodySmall.copyWith(
+                          color: isDark ? FintechColors.textPrimary : FintechColors.lightTextPrimary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Text(
+                      '₹${cat.value >= 1000 ? "${(cat.value / 1000).toStringAsFixed(1)}k" : cat.value.toStringAsFixed(0)}',
+                      style: FintechTypography.bodySmall.copyWith(
+                        color: isDark ? FintechColors.textPrimary : FintechColors.lightTextPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '(${share.toStringAsFixed(1)}%)',
+                      style: FintechTypography.caption.copyWith(
+                        color: isDark ? FintechColors.textSecondary : FintechColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: pct.clamp(0.0, 1.0),
+                    minHeight: 6,
+                    backgroundColor: color.withOpacity(0.12),
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
   }
 }

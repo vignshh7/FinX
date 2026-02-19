@@ -268,7 +268,7 @@ class ApiService {
   Future<Map<String, dynamic>> getSpendingPrediction() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/predict'),
+        Uri.parse('$baseUrl/ai/prediction'),
         headers: await _getHeaders(),
       );
       
@@ -278,18 +278,18 @@ class ApiService {
     }
   }
   
-  // Alerts API
+  // Alerts/Anomalies API
   Future<List<dynamic>> getAlerts() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/alerts'),
+        Uri.parse('$baseUrl/ai/anomalies'),
         headers: await _getHeaders(),
       );
       
       final data = _handleResponse(response);
-      return data['alerts'] as List;
+      return data['anomalies'] as List? ?? [];
     } catch (e) {
-      throw Exception('Failed to fetch alerts: $e');
+      throw Exception('Failed to get alerts: $e');
     }
   }
   
@@ -353,7 +353,7 @@ class ApiService {
     }
   }
   
-  Future<Budget> updateBudget(double monthlyLimit, String currency) async {
+  Future<Budget> updateBudgetSettings(double monthlyLimit, String currency) async {
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/budget'),
@@ -486,7 +486,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> getAiInsights({String? month, String? year}) async {
     try {
-      var uri = Uri.parse('$baseUrl/ai-insights');
+      var uri = Uri.parse('$baseUrl/ai/insights');
 
       final query = <String, String>{};
       if (month != null) query['month'] = month;
@@ -516,6 +516,287 @@ class ApiService {
       _handleResponse(response);
     } catch (e) {
       throw Exception('Failed to submit feedback: $e');
+    }
+  }
+
+  // ===============================
+  // NEW COMPREHENSIVE AI ENDPOINTS
+  // ===============================
+
+  // Get complete AI analysis (all modules)
+  Future<Map<String, dynamic>> getCompleteAIAnalysis() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/ai/complete-analysis'),
+        headers: await _getHeaders(),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to get AI analysis: $e');
+    }
+  }
+
+  // Get financial advice
+  Future<Map<String, dynamic>> getFinancialAdvice() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/ai/advice'),
+        headers: await _getHeaders(),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to get financial advice: $e');
+    }
+  }
+
+  // Get spending aggregation
+  Future<Map<String, dynamic>> getSpendingAggregation({int months = 6}) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/ai/aggregation?months=$months'),
+        headers: await _getHeaders(),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to get spending aggregation: $e');
+    }
+  }
+
+  // Auto-categorize expense
+  Future<Map<String, dynamic>> categorizeExpense({
+    required String storeName,
+    List<String>? items,
+    String? description,
+  }) async {
+    try {
+      final body = {
+        'store_name': storeName,
+        if (items != null) 'items': items,
+        if (description != null) 'description': description,
+      };
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/ai/categorize'),
+        headers: await _getHeaders(),
+        body: jsonEncode(body),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to categorize expense: $e');
+    }
+  }
+
+  // Budget APIs
+  Future<List<dynamic>> getBudgets() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/budgets'),
+        headers: await _getHeaders(),
+      );
+      final data = _handleResponse(response);
+      return data['budgets'] ?? [];
+    } catch (e) {
+      throw Exception('Failed to load budgets: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> createBudget(Map<String, dynamic> budgetData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/budgets'),
+        headers: await _getHeaders(),
+        body: jsonEncode(budgetData),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to create budget: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> updateBudget(String budgetId, Map<String, dynamic> budgetData) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/budgets/$budgetId'),
+        headers: await _getHeaders(),
+        body: jsonEncode(budgetData),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to update budget: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteBudget(String budgetId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/budgets/$budgetId'),
+        headers: await _getHeaders(),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to delete budget: $e');
+    }
+  }
+
+  // Savings Goals APIs
+  Future<List<dynamic>> getSavingsGoals() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/savings-goals'),
+        headers: await _getHeaders(),
+      );
+      final data = _handleResponse(response);
+      return data['goals'] ?? [];
+    } catch (e) {
+      throw Exception('Failed to load savings goals: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> createSavingsGoal(Map<String, dynamic> goalData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/savings-goals'),
+        headers: await _getHeaders(),
+        body: jsonEncode(goalData),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to create savings goal: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> updateSavingsGoal(String goalId, Map<String, dynamic> goalData) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/savings-goals/$goalId'),
+        headers: await _getHeaders(),
+        body: jsonEncode(goalData),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to update savings goal: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteSavingsGoal(String goalId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/savings-goals/$goalId'),
+        headers: await _getHeaders(),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to delete savings goal: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> addSavingsContribution(Map<String, dynamic> contributionData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/savings-contributions'),
+        headers: await _getHeaders(),
+        body: jsonEncode(contributionData),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to add savings contribution: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getSavingsMonthlyReport({required int year, required int month}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/savings-reports/monthly')
+          .replace(queryParameters: {
+            'year': year.toString(),
+            'month': month.toString(),
+          });
+      final response = await http.get(
+        uri,
+        headers: await _getHeaders(),
+      );
+      final data = _handleResponse(response);
+      return data['report'] ?? {};
+    } catch (e) {
+      throw Exception('Failed to load savings monthly report: $e');
+    }
+  }
+
+  // Bill Reminders APIs
+  Future<List<dynamic>> getBillReminders() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/bill-reminders'),
+        headers: await _getHeaders(),
+      );
+      // Server may return a plain array or {bills: [...]} — handle both
+      final body = response.body;
+      final decoded = jsonDecode(body);
+      if (decoded is List) return decoded;
+      if (decoded is Map) return decoded['bills'] ?? decoded['data'] ?? [];
+      return [];
+    } catch (e) {
+      throw Exception('Failed to load bill reminders: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> createBillReminder(Map<String, dynamic> billData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/bill-reminders'),
+        headers: await _getHeaders(),
+        body: jsonEncode(billData),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to create bill reminder: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> updateBillReminder(String billId, Map<String, dynamic> billData) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/bill-reminders/$billId'),
+        headers: await _getHeaders(),
+        body: jsonEncode(billData),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to update bill reminder: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteBillReminder(String billId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/bill-reminders/$billId'),
+        headers: await _getHeaders(),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to delete bill reminder: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> markBillAsPaid(String billId, String? paymentMethod) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/bill-reminders/$billId/pay'),
+        headers: await _getHeaders(),
+        body: jsonEncode({
+          'payment_method': paymentMethod,
+          'paid_date': DateTime.now().toIso8601String(),
+        }),
+      );
+      // Backend returns the updated bill object directly, not wrapped
+      final decoded = jsonDecode(response.body);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return decoded is Map<String, dynamic>
+            ? {'success': true, 'bill': decoded}
+            : {'success': true};
+      }
+      throw Exception('HTTP ${response.statusCode}');
+    } catch (e) {
+      throw Exception('Failed to mark bill as paid: $e');
     }
   }
 

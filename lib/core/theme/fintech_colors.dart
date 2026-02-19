@@ -85,6 +85,7 @@ class FintechColors {
   static const Color lightCardBackground = Color(0xFFFFFFFF);
   static const Color lightTextPrimary = Color(0xFF1F2937);
   static const Color lightTextSecondary = Color(0xFF6B7280);
+  static const Color lightBorderColor = Color(0xFFE5E7EB);
   
   // Aliases for compatibility
   static const Color darkBackground = primaryBackground;

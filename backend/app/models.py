@@ -176,3 +176,113 @@ class CategorizationFeedback(db.Model):
             'confidence': self.confidence,
             'created_at': self.created_at.isoformat(),
         }
+
+
+class SavingsGoal(db.Model):
+    __tablename__ = 'savings_goals'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    title = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    target_amount = db.Column(db.Float, nullable=False)
+    current_amount = db.Column(db.Float, default=0.0)
+    target_date = db.Column(db.DateTime)
+    category = db.Column(db.String(50))
+    priority = db.Column(db.String(20), default='medium')  # low, medium, high
+    is_completed = db.Column(db.Boolean, default=False)
+    currency = db.Column(db.String(10), default='USD')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    contributions = db.relationship(
+        'SavingsContribution',
+        backref='goal',
+        lazy=True,
+        cascade='all, delete-orphan'
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'title': self.title,
+            'description': self.description,
+            'target_amount': self.target_amount,
+            'current_amount': self.current_amount,
+            'target_date': self.target_date.isoformat() if self.target_date else None,
+            'category': self.category,
+            'priority': self.priority,
+            'is_completed': self.is_completed,
+            'currency': self.currency,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'contributions': [c.to_dict() for c in self.contributions],
+        }
+
+
+class SavingsContribution(db.Model):
+    __tablename__ = 'savings_contributions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    goal_id = db.Column(db.Integer, db.ForeignKey('savings_goals.id'), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    note = db.Column(db.Text)
+    type = db.Column(db.String(20), default='manual')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'goal_id': self.goal_id,
+            'amount': self.amount,
+            'date': self.date.isoformat() if self.date else None,
+            'note': self.note,
+            'type': self.type,
+            'created_at': self.created_at.isoformat(),
+        }
+
+
+class BillReminder(db.Model):
+    __tablename__ = 'bill_reminders'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    title = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    amount = db.Column(db.Float, nullable=False)
+    due_date = db.Column(db.DateTime, nullable=False)
+    frequency = db.Column(db.String(20), default='monthly')  # once, daily, weekly, monthly, yearly
+    category = db.Column(db.String(50))
+    priority = db.Column(db.String(20), default='medium')  # low, medium, high
+    is_recurring = db.Column(db.Boolean, default=False)
+    is_paid = db.Column(db.Boolean, default=False)
+    paid_date = db.Column(db.DateTime)
+    payment_method = db.Column(db.String(50))
+    status = db.Column(db.String(20), default='pending')  # pending, paid, overdue
+    currency = db.Column(db.String(10), default='USD')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'title': self.title,
+            'description': self.description,
+            'amount': self.amount,
+            'due_date': self.due_date.isoformat() if self.due_date else None,
+            'frequency': self.frequency,
+            'category': self.category,
+            'priority': self.priority,
+            'is_recurring': self.is_recurring,
+            'is_paid': self.is_paid,
+            'paid_date': self.paid_date.isoformat() if self.paid_date else None,
+            'payment_method': self.payment_method,
+            'status': self.status,
+            'currency': self.currency,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
