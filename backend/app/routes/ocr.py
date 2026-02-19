@@ -4,12 +4,14 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 import os
 from app.services.ocr_service import OCRService  # Use real OCR service
 from app.services.simple_ml_service import ExpenseCategorizer
+from app.services.groq_categorizer_service import GroqExpenseCategorizer
 
 ocr_bp = Blueprint('ocr', __name__)
 
 # Initialize services
 ocr_service = OCRService()
 categorizer = ExpenseCategorizer()
+groq_categorizer = GroqExpenseCategorizer()
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'heic', 'heif', 'bmp', 'gif'}
 
@@ -85,12 +87,24 @@ def upload_receipt():
         
         print(f"✓ OCR Success - Store: {ocr_result['store']}, Amount: {ocr_result['amount']}")
         
-        # Categorize expense using ML
+        # Categorize expense using Groq with OCR context, fallback to simple categorizer
         print("🤖 Categorizing expense...")
-        category_result = categorizer.categorize_expense(
-            ocr_result['store'],
-            ocr_result['amount']
-        )
+        try:
+            category_result = groq_categorizer.categorize_expense(
+                store_name=ocr_result.get('store', ''),
+                items=ocr_result.get('items', []),
+                amount=ocr_result.get('amount', 0),
+                raw_text=ocr_result.get('raw_text', '')
+            )
+        except Exception as groq_error:
+            print(f"⚠️ Groq categorization failed, falling back: {str(groq_error)}")
+            category_result = categorizer.categorize_expense(
+                ocr_result.get('store', ''),
+                ocr_result.get('amount', 0)
+            )
+            category_result['method'] = 'rule-based-fallback'
+            category_result['fallback_reason'] = str(groq_error)
+
         print(f"✓ Category: {category_result.get('category', 'Other')} (confidence: {category_result.get('confidence', 0)})")
         
         # Clean up uploaded file
@@ -108,6 +122,7 @@ def upload_receipt():
             'date': ocr_result['date'],
             'predicted_category': category_result.get('category', 'Other'),
             'confidence': category_result.get('confidence', 0.5),
+            'categorization_method': category_result.get('method', 'unknown'),
             'raw_text': ocr_result.get('raw_text', ''),
             'ocr_provider': ocr_result.get('ocr_provider', 'ocrspace'),
             'ocr_mode': ocr_result.get('ocr_mode', 'cloud'),

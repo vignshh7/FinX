@@ -250,6 +250,19 @@ class ApiService {
       throw Exception('Failed to create expense: $e');
     }
   }
+
+  Future<Map<String, dynamic>> addExpense(Map<String, dynamic> expenseJson) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/expenses'),
+        headers: await _getHeaders(),
+        body: jsonEncode(expenseJson),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to add expense: $e');
+    }
+  }
   
   Future<void> deleteExpense(int id) async {
     try {

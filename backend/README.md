@@ -71,7 +71,18 @@ python run.py
 
 The API will be available at: `https://finx-ugs5.onrender.com`
 
+
 ## API Endpoints
+
+### Health & Status
+
+**GET /api/health**
+- Returns API health status (no auth required)
+
+**GET /api/ocr-status**
+- Returns OCR service status and provider info
+
+---
 
 ### Authentication
 
@@ -84,30 +95,23 @@ The API will be available at: `https://finx-ugs5.onrender.com`
 - Body: `{ "email": "john@email.com", "password": "password123" }`
 - Returns: `{ "id", "name", "email", "token" }`
 
+---
+
 ### OCR (Core Feature)
 
 **POST /api/upload-receipt**
-- Upload receipt image for OCR processing
+- Upload receipt image for OCR processing and auto-categorization
 - Headers: `Authorization: Bearer <token>`
 - Body: `multipart/form-data` with `receipt` file
-- Returns:
-```json
-{
-  "store": "ABC Supermarket",
-  "items": ["Milk", "Bread"],
-  "amount": 450.00,
-  "date": "2026-01-20",
-  "predicted_category": "Food",
-  "confidence": 0.95
-}
-```
+- Returns: `{ "store", "items", "amount", "date", "predicted_category", "confidence" }`
+
+---
 
 ### Expenses
 
 **GET /api/expenses**
-- Get all expenses (with optional filters)
+- Get all expenses (with optional filters: `category`, `start_date`, `end_date`)
 - Headers: `Authorization: Bearer <token>`
-- Query params: `?category=Food&start_date=2026-01-01&end_date=2026-01-31`
 
 **POST /api/expenses**
 - Create new expense
@@ -118,17 +122,24 @@ The API will be available at: `https://finx-ugs5.onrender.com`
 - Delete expense
 - Headers: `Authorization: Bearer <token>`
 
-### Predictions
+**POST /api/expenses/<id>/feedback**
+- Submit feedback/correction for expense categorization
+- Headers: `Authorization: Bearer <token>`
+- Body: `{ "correct_category": "Shopping", "confidence": 0.9 }`
+
+---
+
+### Predictions & Alerts
 
 **GET /api/predict**
 - Get AI prediction for next month's spending
 - Headers: `Authorization: Bearer <token>`
-- Returns: `{ "predicted_amount", "confidence", "based_on_months" }`
 
 **GET /api/alerts**
 - Get budget alerts
 - Headers: `Authorization: Bearer <token>`
-- Returns: `{ "alerts": [...] }`
+
+---
 
 ### Subscriptions
 
@@ -145,6 +156,30 @@ The API will be available at: `https://finx-ugs5.onrender.com`
 - Delete subscription
 - Headers: `Authorization: Bearer <token>`
 
+---
+
+### Incomes
+
+**GET /api/incomes**
+- Get all incomes (optional filters: `month`, `year`)
+- Headers: `Authorization: Bearer <token>`
+
+**POST /api/incomes**
+- Create new income entry
+- Headers: `Authorization: Bearer <token>`
+- Body: `{ "source", "amount", "date", "category", "currency", "is_recurring", "notes" }`
+
+**PUT /api/incomes/<id>**
+- Update income entry
+- Headers: `Authorization: Bearer <token>`
+- Body: (fields to update)
+
+**DELETE /api/incomes/<id>**
+- Delete income entry
+- Headers: `Authorization: Bearer <token>`
+
+---
+
 ### Budget
 
 **GET /api/budget**
@@ -155,6 +190,50 @@ The API will be available at: `https://finx-ugs5.onrender.com`
 - Create/update budget
 - Headers: `Authorization: Bearer <token>`
 - Body: `{ "monthly_limit", "currency" }`
+
+**GET /api/budget/categories**
+- Get per-category budgets
+- Headers: `Authorization: Bearer <token>`
+
+---
+
+### Savings Goals
+
+**GET /api/savings-goals**
+- Get all savings goals
+- Headers: `Authorization: Bearer <token>`
+
+**POST /api/savings-goals**
+- Create new savings goal
+- Headers: `Authorization: Bearer <token>`
+- Body: `{ "title", "target_amount", ... }`
+
+**GET /api/savings-goals/<id>**
+- Get a specific savings goal
+- Headers: `Authorization: Bearer <token>`
+
+**PUT /api/savings-goals/<id>**
+- Update a savings goal
+- Headers: `Authorization: Bearer <token>`
+- Body: (fields to update)
+
+**DELETE /api/savings-goals/<id>**
+- Delete a savings goal
+- Headers: `Authorization: Bearer <token>`
+
+**POST /api/savings-goals/<id>/contribute**
+- Contribute to a savings goal
+- Headers: `Authorization: Bearer <token>`
+- Body: `{ "amount": 100, "date": "2026-02-19", ... }`
+
+**POST /api/savings-contributions**
+- Add a savings contribution (by goal id)
+- Headers: `Authorization: Bearer <token>`
+- Body: `{ "goal_id": 1, "amount": 50, ... }`
+
+**GET /api/savings-reports/monthly**
+- Get monthly savings report
+- Headers: `Authorization: Bearer <token>`
 
 ## OCR Pipeline
 
