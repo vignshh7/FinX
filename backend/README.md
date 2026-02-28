@@ -38,258 +38,166 @@ AI-Powered Personal Finance Application with OCR Receipt Scanning
 cd backend
 python -m venv venv
 ```
+# Smart Finance Backend
 
-2. **Activate virtual environment**
+Flask backend for the Smart Finance mobile app. Provides OCR receipt processing, expense categorization, and analytics APIs.
+
+## Features
+
+- User authentication (JWT)
+- Receipt OCR (Tesseract)
+- Expense categorization (ML/NLP)
+- Spending prediction and alerts
+- Subscriptions, budgets, incomes, savings goals
+- REST API for the Flutter app
+
+## Tech Stack
+
+- Flask, SQLAlchemy, Flask-JWT-Extended
+- SQLite (local), PostgreSQL-ready for production
+- Tesseract OCR + OpenCV
+- Scikit-learn, NLTK
+
+## Setup
+
+### Prerequisites
+
+- Python 3.8+
+- Tesseract OCR
+  - Windows: https://github.com/UB-Mannheim/tesseract/wiki
+  - macOS: `brew install tesseract`
+  - Linux: `sudo apt-get install tesseract-ocr`
+
+### Local install
+
 ```bash
-# Windows
+cd backend
+python -m venv venv
 venv\Scripts\activate
-
-# Mac/Linux
-source venv/bin/activate
-```
-
-3. **Install dependencies**
-```bash
 pip install -r requirements.txt
-```
-
-4. **Configure environment**
-```bash
-# Copy example env file
 cp .env.example .env
-
-# Edit .env and update:
-# - TESSERACT_CMD path (if different)
-# - SECRET_KEY (change in production)
-# - JWT_SECRET_KEY (change in production)
-```
-
-5. **Run the application**
-```bash
+# Update .env with your Tesseract path and secrets
 python run.py
 ```
 
-The API will be available at: `http://localhost:5000`
+Default API URL: `https://finx-ugs5.onrender.com`
 
-## API Endpoints
+## API Overview
 
-### Authentication
+### Health
 
-**POST /api/register**
-- Register new user
-- Body: `{ "name": "John", "email": "john@email.com", "password": "password123" }`
+- GET /api/health
+- GET /api/ocr-status
 
-**POST /api/login**
-- Login and get JWT token
-- Body: `{ "email": "john@email.com", "password": "password123" }`
-- Returns: `{ "id", "name", "email", "token" }`
+### Auth
 
-### OCR (Core Feature)
+- POST /api/register
+- POST /api/login
 
-**POST /api/upload-receipt**
-- Upload receipt image for OCR processing
-- Headers: `Authorization: Bearer <token>`
-- Body: `multipart/form-data` with `receipt` file
-- Returns:
-```json
-{
-  "store": "ABC Supermarket",
-  "items": ["Milk", "Bread"],
-  "amount": 450.00,
-  "date": "2026-01-20",
-  "predicted_category": "Food",
-  "confidence": 0.95
-}
-```
+### OCR
+
+- POST /api/upload-receipt
 
 ### Expenses
 
-**GET /api/expenses**
-- Get all expenses (with optional filters)
-- Headers: `Authorization: Bearer <token>`
-- Query params: `?category=Food&start_date=2026-01-01&end_date=2026-01-31`
+- GET /api/expenses
+- POST /api/expenses
+- DELETE /api/expenses/<id>
+- POST /api/expenses/<id>/feedback
 
-**POST /api/expenses**
-- Create new expense
-- Headers: `Authorization: Bearer <token>`
-- Body: `{ "store", "amount", "category", "date", "items", "raw_ocr_text" }`
+### Predictions and Alerts
 
-**DELETE /api/expenses/<id>**
-- Delete expense
-- Headers: `Authorization: Bearer <token>`
-
-### Predictions
-
-**GET /api/predict**
-- Get AI prediction for next month's spending
-- Headers: `Authorization: Bearer <token>`
-- Returns: `{ "predicted_amount", "confidence", "based_on_months" }`
-
-**GET /api/alerts**
-- Get budget alerts
-- Headers: `Authorization: Bearer <token>`
-- Returns: `{ "alerts": [...] }`
+- GET /api/predict
+- GET /api/alerts
 
 ### Subscriptions
 
-**GET /api/subscriptions**
-- Get all subscriptions
-- Headers: `Authorization: Bearer <token>`
+- GET /api/subscriptions
+- POST /api/subscriptions
+- DELETE /api/subscriptions/<id>
 
-**POST /api/subscriptions**
-- Create subscription
-- Headers: `Authorization: Bearer <token>`
-- Body: `{ "name", "amount", "frequency", "renewal_date" }`
+### Incomes
 
-**DELETE /api/subscriptions/<id>**
-- Delete subscription
-- Headers: `Authorization: Bearer <token>`
+- GET /api/incomes
+- POST /api/incomes
+- PUT /api/incomes/<id>
+- DELETE /api/incomes/<id>
 
 ### Budget
 
-**GET /api/budget**
-- Get user budget
-- Headers: `Authorization: Bearer <token>`
+- GET /api/budget
+- PUT /api/budget
+- GET /api/budget/categories
 
-**PUT /api/budget**
-- Create/update budget
-- Headers: `Authorization: Bearer <token>`
-- Body: `{ "monthly_limit", "currency" }`
+### Savings Goals
+
+- GET /api/savings-goals
+- POST /api/savings-goals
+- GET /api/savings-goals/<id>
+- PUT /api/savings-goals/<id>
+- DELETE /api/savings-goals/<id>
+- POST /api/savings-goals/<id>/contribute
+- POST /api/savings-contributions
+- GET /api/savings-reports/monthly
 
 ## OCR Pipeline
 
-### Image Preprocessing
-1. **Grayscale Conversion** - Simplifies image processing
-2. **Denoising** - Removes noise using Non-Local Means Denoising
-3. **Adaptive Thresholding** - Converts to binary image
-4. **Resizing** - Scales image to optimal size for OCR
-
-### Text Extraction
-- Uses Tesseract OCR engine
-- PSM mode 6 (uniform block of text)
-
-### Data Extraction
-- **Store Name**: First non-empty line
-- **Amount**: Regex patterns for currency values
-- **Date**: Multiple date format patterns
-- **Items**: Heuristic-based item detection
+- Preprocess image (grayscale, denoise, threshold, resize)
+- Extract text with Tesseract (PSM 6)
+- Parse store, amount, date, and items with regex heuristics
 
 ## ML Categorization
 
-### Model
-- **Algorithm**: Naive Bayes with TF-IDF vectorization
-- **Categories**: Food, Travel, Shopping, Bills, Entertainment, Other
-- **Features**: Store name + item names (combined text)
-
-### Training
-- Pre-trained on sample data
-- Can be retrained with user data
-- Model saved to `app/ml_models/categorizer.pkl`
+- Model: Naive Bayes + TF-IDF
+- Categories: Food, Travel, Shopping, Bills, Entertainment, Other
+- Model file: app/ml_models/categorizer.pkl
 
 ## Spending Prediction
 
-### Algorithm
-- **Method**: Weighted moving average with trend analysis
-- **Data**: Last 6 months of expenses
-- **Weighting**: Recent months have higher weight
-- **Trend Adjustment**: Linear trend added to prediction
-
-## Database Schema
-
-### Users
-- id, name, email, password_hash, created_at
-
-### Expenses
-- id, user_id, store, amount, category, date, items, raw_ocr_text, created_at
-
-### Subscriptions
-- id, user_id, name, amount, frequency, renewal_date, created_at
-
-### Budgets
-- id, user_id, monthly_limit, currency, created_at, updated_at
+- Weighted moving average over the last 6 months
+- Trend adjustment based on recent change
 
 ## Project Structure
 
 ```
 backend/
-├── app/
-│   ├── __init__.py           # Flask app factory
-│   ├── models.py             # SQLAlchemy models
-│   ├── routes/
-│   │   ├── auth.py           # Authentication endpoints
-│   │   ├── expenses.py       # Expense management
-│   │   ├── ocr.py           # OCR upload endpoint
-│   │   ├── subscriptions.py  # Subscription management
-│   │   └── budget.py         # Budget management
-│   ├── services/
-│   │   ├── ocr_service.py    # OCR processing
-│   │   ├── ml_service.py     # ML categorization
-│   │   └── prediction_service.py  # Predictions & alerts
-│   └── ml_models/            # Trained ML models
-├── uploads/                  # Temporary file uploads
-├── requirements.txt          # Python dependencies
-├── .env.example             # Environment template
-└── run.py                   # Application entry point
+  app/
+    __init__.py
+    models.py
+    routes/
+    services/
+    ml_models/
+  uploads/
+  requirements.txt
+  .env.example
+  run.py
 ```
 
 ## Testing
 
-### Test OCR Endpoint
-
 ```bash
-curl -X POST http://localhost:5000/api/upload-receipt \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -F "receipt=@receipt.jpg"
-```
-
-### Test Registration
-
-```bash
-curl -X POST http://localhost:5000/api/register \
+curl -X POST https://finx-ugs5.onrender.com/api/register \
   -H "Content-Type: application/json" \
   -d '{"name":"Test User","email":"test@test.com","password":"password123"}'
 ```
 
-## Production Deployment
+```bash
+curl -X POST https://finx-ugs5.onrender.com/api/upload-receipt \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "receipt=@receipt.jpg"
+```
 
-### Recommended Changes
+## Production Notes
 
-1. **Change SECRET_KEY and JWT_SECRET_KEY** in .env
-2. **Use PostgreSQL** instead of SQLite
-3. **Set up HTTPS**
-4. **Enable CORS properly** for production domain
-5. **Use Gunicorn** as production server:
-   ```bash
-   pip install gunicorn
-   gunicorn -w 4 -b 0.0.0.0:5000 run:app
-   ```
-6. **Set up logging** to file
-7. **Add rate limiting**
-8. **Configure file upload limits**
+- Change `SECRET_KEY` and `JWT_SECRET_KEY` in `.env`
+- Use PostgreSQL instead of SQLite
+- Enforce CORS for your production domain
+- Use Gunicorn or a production WSGI server
 
 ## Troubleshooting
 
-### Tesseract Not Found
-- Ensure Tesseract is installed
-- Update `TESSERACT_CMD` in .env with correct path
+- Tesseract not found: update `TESSERACT_CMD` in `.env`
+- Import errors: re-activate venv and reinstall requirements
+- Database issues: delete `finance.db` to recreate tables
 
-### Import Errors
-- Activate virtual environment
-- Reinstall requirements: `pip install -r requirements.txt`
 
-### Database Errors
-- Delete `finance.db` and restart to recreate tables
-
-### OCR Low Accuracy
-- Ensure good image quality
-- Proper lighting
-- Clear, flat receipts
-- Adjust preprocessing parameters in `ocr_service.py`
-
-## License
-
-MIT License
-
-## Author
-
-AI-Powered Smart Finance Team
