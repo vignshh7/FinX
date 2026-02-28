@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/user_model.dart';
 import '../models/expense_model.dart';
 import '../models/ocr_result_model.dart';
@@ -10,19 +12,44 @@ import '../models/subscription_model.dart';
 import '../models/budget_model.dart';
 
 class ApiService {
-  // Backend base URL (configurable from Settings)
-  // Defaults:
-  // - Android emulator: http://10.0.2.2:5000/api
-  // - Physical device:  http://<your-computer-lan-ip>:5000/api
+  // Auto-detect environment
+  // Debug mode → Local backend
+  // Release mode → Production backend
+  static const String _productionUrl = 'https://finx-ugs5.onrender.com/api';
+  
+  // Platform-specific local URLs
+  static String get _localUrl {
+    if (kIsWeb) {
+      return 'http://localhost:5000/api'; // Web
+    } else if (Platform.isAndroid) {
+      // Check if running on emulator or physical device
+      // For emulator: 10.0.2.2 (localhost alias)
+      // For physical device: use your PC's local IP
+     return 'http://172.20.0.37:5000/api';// Default to emulator
+      // If not working, change to: 'http://172.20.0.37:5000/api' for physical device
+    } else if (Platform.isIOS) {
+      return 'http://localhost:5000/api'; // iOS simulator
+    } else if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      return 'http://localhost:5000/api'; // Desktop
+    }
+    return 'http://localhost:5000/api'; // Fallback
+  }
+  
   static const String _baseUrlPrefKey = 'api_base_url';
-  static const String _defaultBaseUrl = 'http://10.0.2.2:5000/api';
-  static String _baseUrl = _defaultBaseUrl;
+  static String _baseUrl = kReleaseMode ? _productionUrl : _localUrl;
 
   static String get baseUrl => _baseUrl;
 
   static Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
-    _baseUrl = (prefs.getString(_baseUrlPrefKey) ?? _defaultBaseUrl).trim();
+    // Allow manual override, otherwise use auto-detected URL
+    final savedUrl = prefs.getString(_baseUrlPrefKey);
+    if (savedUrl != null && savedUrl.isNotEmpty) {
+      _baseUrl = savedUrl.trim();
+    } else {
+      // Auto-detect: Release = Production, Debug = Local
+      _baseUrl = kReleaseMode ? _productionUrl : _localUrl;
+    }
   }
 
   static Future<void> setBaseUrl(String url) async {
@@ -30,6 +57,12 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_baseUrlPrefKey, normalized);
     _baseUrl = normalized;
+  }
+  
+  static Future<void> resetToDefault() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_baseUrlPrefKey);
+    _baseUrl = kReleaseMode ? _productionUrl : _localUrl;
   }
   
   final _storage = const FlutterSecureStorage();
@@ -67,11 +100,23 @@ class ApiService {
           'email': email,
           'password': password,
         }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Connection timeout. Please check your internet connection.');
+        },
       );
       
       return _handleResponse(response);
+    } on SocketException {
+      throw Exception('No internet connection. Please check your network.');
+    } on http.ClientException {
+      throw Exception('Failed to connect to server. Please try again.');
     } catch (e) {
-      throw Exception('Registration failed: $e');
+      if (e.toString().contains('Exception:')) {
+        rethrow;
+      }
+      throw Exception('Registration failed: ${e.toString()}');
     }
   }
   
@@ -84,42 +129,85 @@ class ApiService {
           'email': email,
           'password': password,
         }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Connection timeout. Please check your internet connection.');
+        },
       );
       
       final data = _handleResponse(response);
       final user = User.fromJson(data);
       await saveToken(user.token);
       return user;
+    } on SocketException {
+      throw Exception('No internet connection. Please check your network.');
+    } on http.ClientException {
+      throw Exception('Failed to connect to server. Please try again.');
     } catch (e) {
-      throw Exception('Login failed: $e');
+      if (e.toString().contains('Exception:')) {
+        rethrow;
+      }
+      throw Exception('Login failed: ${e.toString()}');
     }
   }
   
   // OCR Upload API
-  Future<OCRResult> uploadReceipt(File imageFile) async {
+  Future<OCRResult> uploadReceipt(XFile imageFile) async {
     try {
+      print('🔐 Getting auth token...');
       final token = await getToken();
       if (token == null || token.isEmpty) {
         throw Exception('Not authenticated. Please login again.');
       }
+      print('✓ Token obtained');
+      
+      print('📦 Preparing multipart request to: $baseUrl/upload-receipt');
       var request = http.MultipartRequest(
         'POST',
         Uri.parse('$baseUrl/upload-receipt'),
       );
       
       request.headers['Authorization'] = 'Bearer $token';
-      request.files.add(await http.MultipartFile.fromPath(
-        'receipt',
-        imageFile.path,
-      ));
       
-      final streamedResponse = await request.send();
+      // Read file as bytes (works on all platforms)
+      final bytes = await imageFile.readAsBytes();
+      final filename = imageFile.name;
+      
+      request.files.add(http.MultipartFile.fromBytes(
+        'receipt',
+        bytes,
+        filename: filename,
+      ));
+      print('✓ File added to request: $filename (${bytes.length} bytes)');
+      
+      print('🌐 Sending request...');
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 45),
+        onTimeout: () {
+          throw Exception('Connection timeout. The server took too long to respond.');
+        },
+      );
+      
       final response = await http.Response.fromStream(streamedResponse);
+      print('📥 Response received: ${response.statusCode}');
+      print('📄 Response body: ${response.body}');
       
       final data = _handleResponse(response);
+      print('✅ Parsing OCR result...');
       return OCRResult.fromJson(data);
+    } on SocketException {
+      print('❌ SocketException: No internet connection');
+      throw Exception('No internet connection. Please check your network.');
+    } on http.ClientException catch (e) {
+      print('❌ ClientException: $e');
+      throw Exception('Failed to connect to server. Please try again.');
     } catch (e) {
-      throw Exception('Receipt upload failed: $e');
+      print('❌ Exception during upload: $e');
+      if (e.toString().contains('Exception:')) {
+        rethrow;
+      }
+      throw Exception('Receipt upload failed: ${e.toString()}');
     }
   }
   
@@ -162,6 +250,19 @@ class ApiService {
       throw Exception('Failed to create expense: $e');
     }
   }
+
+  Future<Map<String, dynamic>> addExpense(Map<String, dynamic> expenseJson) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/expenses'),
+        headers: await _getHeaders(),
+        body: jsonEncode(expenseJson),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to add expense: $e');
+    }
+  }
   
   Future<void> deleteExpense(int id) async {
     try {
@@ -180,7 +281,7 @@ class ApiService {
   Future<Map<String, dynamic>> getSpendingPrediction() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/predict'),
+        Uri.parse('$baseUrl/ai/prediction'),
         headers: await _getHeaders(),
       );
       
@@ -190,18 +291,18 @@ class ApiService {
     }
   }
   
-  // Alerts API
+  // Alerts/Anomalies API
   Future<List<dynamic>> getAlerts() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/alerts'),
+        Uri.parse('$baseUrl/ai/anomalies'),
         headers: await _getHeaders(),
       );
       
       final data = _handleResponse(response);
-      return data['alerts'] as List;
+      return data['anomalies'] as List? ?? [];
     } catch (e) {
-      throw Exception('Failed to fetch alerts: $e');
+      throw Exception('Failed to get alerts: $e');
     }
   }
   
@@ -265,7 +366,7 @@ class ApiService {
     }
   }
   
-  Future<Budget> updateBudget(double monthlyLimit, String currency) async {
+  Future<Budget> updateBudgetSettings(double monthlyLimit, String currency) async {
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/budget'),
@@ -350,6 +451,20 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> updateIncome(String id, Map<String, dynamic> incomeJson) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/incomes/$id'),
+        headers: await _getHeaders(),
+        body: jsonEncode(incomeJson),
+      );
+
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to update income: $e');
+    }
+  }
+
   Future<void> deleteIncome(String id) async {
     try {
       final response = await http.delete(
@@ -384,7 +499,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> getAiInsights({String? month, String? year}) async {
     try {
-      var uri = Uri.parse('$baseUrl/ai-insights');
+      var uri = Uri.parse('$baseUrl/ai/insights');
 
       final query = <String, String>{};
       if (month != null) query['month'] = month;
@@ -417,13 +532,305 @@ class ApiService {
     }
   }
 
+  // ===============================
+  // NEW COMPREHENSIVE AI ENDPOINTS
+  // ===============================
+
+  // Get complete AI analysis (all modules)
+  Future<Map<String, dynamic>> getCompleteAIAnalysis() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/ai/complete-analysis'),
+        headers: await _getHeaders(),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to get AI analysis: $e');
+    }
+  }
+
+  // Get financial advice
+  Future<Map<String, dynamic>> getFinancialAdvice() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/ai/advice'),
+        headers: await _getHeaders(),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to get financial advice: $e');
+    }
+  }
+
+  // Get spending aggregation
+  Future<Map<String, dynamic>> getSpendingAggregation({int months = 6}) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/ai/aggregation?months=$months'),
+        headers: await _getHeaders(),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to get spending aggregation: $e');
+    }
+  }
+
+  // Auto-categorize expense
+  Future<Map<String, dynamic>> categorizeExpense({
+    required String storeName,
+    List<String>? items,
+    String? description,
+  }) async {
+    try {
+      final body = {
+        'store_name': storeName,
+        if (items != null) 'items': items,
+        if (description != null) 'description': description,
+      };
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/ai/categorize'),
+        headers: await _getHeaders(),
+        body: jsonEncode(body),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to categorize expense: $e');
+    }
+  }
+
+  // Budget APIs
+  Future<List<dynamic>> getBudgets() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/budgets'),
+        headers: await _getHeaders(),
+      );
+      final data = _handleResponse(response);
+      return data['budgets'] ?? [];
+    } catch (e) {
+      throw Exception('Failed to load budgets: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> createBudget(Map<String, dynamic> budgetData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/budgets'),
+        headers: await _getHeaders(),
+        body: jsonEncode(budgetData),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to create budget: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> updateBudget(String budgetId, Map<String, dynamic> budgetData) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/budgets/$budgetId'),
+        headers: await _getHeaders(),
+        body: jsonEncode(budgetData),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to update budget: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteBudget(String budgetId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/budgets/$budgetId'),
+        headers: await _getHeaders(),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to delete budget: $e');
+    }
+  }
+
+  // Savings Goals APIs
+  Future<List<dynamic>> getSavingsGoals() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/savings-goals'),
+        headers: await _getHeaders(),
+      );
+      final data = _handleResponse(response);
+      return data['goals'] ?? [];
+    } catch (e) {
+      throw Exception('Failed to load savings goals: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> createSavingsGoal(Map<String, dynamic> goalData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/savings-goals'),
+        headers: await _getHeaders(),
+        body: jsonEncode(goalData),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to create savings goal: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> updateSavingsGoal(String goalId, Map<String, dynamic> goalData) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/savings-goals/$goalId'),
+        headers: await _getHeaders(),
+        body: jsonEncode(goalData),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to update savings goal: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteSavingsGoal(String goalId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/savings-goals/$goalId'),
+        headers: await _getHeaders(),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to delete savings goal: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> addSavingsContribution(Map<String, dynamic> contributionData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/savings-contributions'),
+        headers: await _getHeaders(),
+        body: jsonEncode(contributionData),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to add savings contribution: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getSavingsMonthlyReport({required int year, required int month}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/savings-reports/monthly')
+          .replace(queryParameters: {
+            'year': year.toString(),
+            'month': month.toString(),
+          });
+      final response = await http.get(
+        uri,
+        headers: await _getHeaders(),
+      );
+      final data = _handleResponse(response);
+      return data['report'] ?? {};
+    } catch (e) {
+      throw Exception('Failed to load savings monthly report: $e');
+    }
+  }
+
+  // Bill Reminders APIs
+  Future<List<dynamic>> getBillReminders() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/bill-reminders'),
+        headers: await _getHeaders(),
+      );
+      // Server may return a plain array or {bills: [...]} — handle both
+      final body = response.body;
+      final decoded = jsonDecode(body);
+      if (decoded is List) return decoded;
+      if (decoded is Map) return decoded['bills'] ?? decoded['data'] ?? [];
+      return [];
+    } catch (e) {
+      throw Exception('Failed to load bill reminders: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> createBillReminder(Map<String, dynamic> billData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/bill-reminders'),
+        headers: await _getHeaders(),
+        body: jsonEncode(billData),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to create bill reminder: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> updateBillReminder(String billId, Map<String, dynamic> billData) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/bill-reminders/$billId'),
+        headers: await _getHeaders(),
+        body: jsonEncode(billData),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to update bill reminder: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteBillReminder(String billId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/bill-reminders/$billId'),
+        headers: await _getHeaders(),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Failed to delete bill reminder: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> markBillAsPaid(String billId, String? paymentMethod) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/bill-reminders/$billId/pay'),
+        headers: await _getHeaders(),
+        body: jsonEncode({
+          'payment_method': paymentMethod,
+          'paid_date': DateTime.now().toIso8601String(),
+        }),
+      );
+      // Backend returns the updated bill object directly, not wrapped
+      final decoded = jsonDecode(response.body);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return decoded is Map<String, dynamic>
+            ? {'success': true, 'bill': decoded}
+            : {'success': true};
+      }
+      throw Exception('HTTP ${response.statusCode}');
+    } catch (e) {
+      throw Exception('Failed to mark bill as paid: $e');
+    }
+  }
+
   // Response Handler
   Map<String, dynamic> _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      return jsonDecode(response.body);
+      try {
+        return jsonDecode(response.body);
+      } catch (e) {
+        print('❌ JSON decode error: $e');
+        print('Raw response: ${response.body}');
+        throw Exception('Invalid response format from server');
+      }
     } else {
-      final error = jsonDecode(response.body);
-      throw Exception(error['message'] ?? 'Request failed');
+      print('❌ HTTP Error ${response.statusCode}: ${response.body}');
+      try {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Request failed with status ${response.statusCode}');
+      } catch (e) {
+        throw Exception('Request failed with status ${response.statusCode}');
+      }
     }
   }
 }

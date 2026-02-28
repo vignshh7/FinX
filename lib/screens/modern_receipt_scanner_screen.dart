@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -19,7 +20,7 @@ class ModernReceiptScannerScreen extends StatefulWidget {
 class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
     with TickerProviderStateMixin {
   final ImagePicker _picker = ImagePicker();
-  File? _selectedImage;
+  XFile? _selectedImage;
   bool _isProcessing = false;
   
   late AnimationController _animationController;
@@ -65,38 +66,32 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+    
     return Scaffold(
       resizeToAvoidBottomInset: true,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return AnimatedBuilder(
-              animation: _animationController,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: _opacityAnimation.value,
-                  child: Transform.scale(
-                    scale: _scaleAnimation.value,
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minHeight: constraints.maxHeight,
-                        ),
-                        child: IntrinsicHeight(
-                          child: Column(
-                            children: [
-                              _buildContent(),
-                              SizedBox(height: bottomPadding + 16),
-                            ],
-                          ),
-                        ),
-                      ),
+        child: AnimatedBuilder(
+          animation: _animationController,
+          builder: (context, child) {
+            return Opacity(
+              opacity: _opacityAnimation.value,
+              child: Transform.scale(
+                scale: _scaleAnimation.value,
+                child: Column(
+                  children: [
+                    _buildAppBar(theme),
+                    Expanded(
+                      child: _selectedImage == null 
+                          ? _buildScannerInterface()
+                          : _buildImagePreview(),
                     ),
-                  ),
-                );
-              },
+                    SizedBox(height: bottomPadding + 16),
+                  ],
+                ),
+              ),
             );
           },
         ),
@@ -104,23 +99,10 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
     );
   }
 
-  Widget _buildContent() {
-    return Column(
-      children: [
-        // Custom App Bar
-        _buildAppBar(),
-        
-        // Main Content
-        Expanded(
-          child: _selectedImage == null 
-              ? _buildScannerInterface()
-              : _buildImagePreview(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAppBar() {
+  Widget _buildAppBar(ThemeData theme) {
+    final textColor = theme.colorScheme.onSurface;
+    final cardColor = theme.cardColor;
+    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
@@ -131,13 +113,20 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: FintechColors.surfaceColor,
+                color: cardColor,
                 borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.arrow_back_ios_new,
                 size: 20,
-                color: FintechColors.textPrimary,
+                color: textColor,
               ),
             ),
           ),
@@ -146,7 +135,7 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
             child: Text(
               'Scan Receipt',
               style: FintechTypography.h4.copyWith(
-                color: FintechColors.textPrimary,
+                color: textColor,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -174,11 +163,17 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
   }
 
   Widget _buildScannerInterface() {
-    return Padding(
+    final theme = Theme.of(context);
+    final textColor = theme.colorScheme.onSurface;
+    final secondaryTextColor = theme.colorScheme.onSurface.withOpacity(0.6);
+    
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          const SizedBox(height: 40),
+          
           // Main Scanner Icon
           Container(
             width: 120,
@@ -207,7 +202,7 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
           Text(
             'Scan Your Receipt',
             style: FintechTypography.h2.copyWith(
-              color: FintechColors.textPrimary,
+              color: textColor,
               fontWeight: FontWeight.w700,
             ),
             textAlign: TextAlign.center,
@@ -216,7 +211,7 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
           Text(
             'Take a photo or select from gallery\nOur AI will automatically extract expense details',
             style: FintechTypography.bodyLarge.copyWith(
-              color: FintechColors.textSecondary,
+              color: secondaryTextColor,
               height: 1.6,
             ),
             textAlign: TextAlign.center,
@@ -231,12 +226,16 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
           
           // Tips Section
           _buildTipsSection(),
+          
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
   Widget _buildActionButtons() {
+    final theme = Theme.of(context);
+    
     return Column(
       children: [
         // Camera Button
@@ -256,7 +255,7 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              elevation: 0,
+              elevation: 2,
             ),
           ),
         ),
@@ -272,12 +271,14 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
             icon: const Icon(Icons.photo_library_outlined),
             label: Text(
               'Choose from Gallery',
-              style: FintechTypography.buttonLarge,
+              style: FintechTypography.buttonLarge.copyWith(
+                color: theme.colorScheme.onSurface,
+              ),
             ),
             style: OutlinedButton.styleFrom(
-              foregroundColor: FintechColors.textPrimary,
-              side: const BorderSide(
-                color: FintechColors.borderColor,
+              foregroundColor: theme.colorScheme.onSurface,
+              side: BorderSide(
+                color: theme.colorScheme.onSurface.withOpacity(0.3),
                 width: 1.5,
               ),
               shape: RoundedRectangleBorder(
@@ -291,6 +292,10 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
   }
 
   Widget _buildTipsSection() {
+    final theme = Theme.of(context);
+    final textColor = theme.colorScheme.onSurface;
+    final secondaryTextColor = theme.colorScheme.onSurface.withOpacity(0.6);
+    
     final tips = [
       {'icon': Icons.flash_on, 'text': 'Use good lighting'},
       {'icon': Icons.center_focus_strong, 'text': 'Focus on the receipt'},
@@ -298,7 +303,6 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
     ];
 
     return FintechCard(
-      backgroundColor: FintechColors.surfaceColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -313,7 +317,7 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
               Text(
                 'Tips for best results',
                 style: FintechTypography.labelLarge.copyWith(
-                  color: FintechColors.textPrimary,
+                  color: textColor,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -327,13 +331,13 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
                 Icon(
                   tip['icon'] as IconData,
                   size: 16,
-                  color: FintechColors.textSecondary,
+                  color: secondaryTextColor,
                 ),
                 const SizedBox(width: 12),
                 Text(
                   tip['text'] as String,
                   style: FintechTypography.bodySmall.copyWith(
-                    color: FintechColors.textSecondary,
+                    color: secondaryTextColor,
                   ),
                 ),
               ],
@@ -355,11 +359,17 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
               padding: const EdgeInsets.all(8),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.file(
-                  _selectedImage!,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
+                child: kIsWeb
+                    ? Image.network(
+                        _selectedImage!.path,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      )
+                    : Image.file(
+                        File(_selectedImage!.path),
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
               ),
             ),
           ),
@@ -430,11 +440,14 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
       );
 
       if (photo != null) {
-        setState(() {
-          _selectedImage = File(photo.path);
-        });
-        _animationController.reset();
-        _animationController.forward();
+        // Validate image using XFile
+        if (await _validateImageXFile(photo)) {
+          setState(() {
+            _selectedImage = photo;
+          });
+          _animationController.reset();
+          _animationController.forward();
+        }
       }
     } catch (e) {
       _showError('Failed to capture image. Please try again.');
@@ -454,14 +467,43 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
       );
 
       if (image != null) {
-        setState(() {
-          _selectedImage = File(image.path);
-        });
-        _animationController.reset();
-        _animationController.forward();
+        // Validate image using XFile
+        if (await _validateImageXFile(image)) {
+          setState(() {
+            _selectedImage = image;
+          });
+          _animationController.reset();
+          _animationController.forward();
+        }
       }
     } catch (e) {
       _showError('Failed to select image. Please try again.');
+    }
+  }
+
+  Future<bool> _validateImageXFile(XFile imageFile) async {
+    try {
+      // Check file size (max 10MB) using XFile method
+      final fileSize = await imageFile.length();
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      
+      if (fileSize > maxSize) {
+        _showError('Image too large. Please select an image under 10MB.');
+        return false;
+      }
+      
+      if (fileSize == 0) {
+        _showError('Invalid image file.');
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Image validation error: $e');
+      }
+      _showError('Failed to validate image: ${e.toString()}');
+      return false;
     }
   }
 
@@ -474,23 +516,53 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
       // Add haptic feedback
       HapticFeedback.mediumImpact();
       
+      print('🚀 Starting receipt processing...');
       final expenseProvider = Provider.of<ExpenseProvider>(context, listen: false);
       final result = await expenseProvider.uploadReceipt(_selectedImage!);
 
-      if (result != null) {
+      print('📊 Result: $result');
+      
+      if (result != null && mounted) {
+        print('✅ Success! Navigating to result screen...');
+        // Success - navigate to result screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const OCRResultScreen(),
+          ),
+        );
+      } else {
+        print('❌ Result is null');
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const OCRResultScreen(),
-            ),
+          // Get the actual error message from the provider
+          final errorMsg = expenseProvider.error ?? 'We couldn\'t extract data from this receipt. Please try again or enter details manually.';
+          print('Error message: $errorMsg');
+          _showErrorWithRetry(
+            'Processing Failed',
+            errorMsg,
           );
         }
-      } else {
-        _showError('Failed to process receipt. Please try again.');
       }
     } catch (e) {
-      _showError('Processing failed: ${e.toString()}');
+      print('❌ Exception in _processImage: $e');
+      if (mounted) {
+        String errorMessage = 'Failed to process receipt.';
+        
+        if (e.toString().contains('timeout') || e.toString().contains('Connection timeout')) {
+          errorMessage = 'Request timed out. Please check your internet connection.';
+        } else if (e.toString().contains('No internet') || e.toString().contains('SocketException')) {
+          errorMessage = 'No internet connection. Please check your network.';
+        } else if (e.toString().contains('Not authenticated')) {
+          errorMessage = 'Session expired. Please login again.';
+        } else if (e.toString().contains('upload')) {
+          errorMessage = 'Failed to upload image. Please try again.';
+        } else {
+          // Show the actual error message
+          errorMessage = e.toString();
+        }
+        
+        _showErrorWithRetry('Upload Failed', errorMessage);
+      }
     }
 
     if (mounted) {
@@ -524,6 +596,67 @@ class _ModernReceiptScannerScreenState extends State<ModernReceiptScannerScreen>
         ),
         margin: const EdgeInsets.all(20),
         duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showErrorWithRetry(String title, String message) {
+    HapticFeedback.heavyImpact();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: FintechColors.errorColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.error_outline,
+                color: FintechColors.errorColor,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: FintechTypography.h5.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: FintechTypography.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _clearImage();
+            },
+            child: const Text('Take Another Photo'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _processImage();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: FintechColors.primaryBlue,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Retry'),
+          ),
+        ],
       ),
     );
   }

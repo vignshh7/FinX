@@ -1,43 +1,3 @@
-# Smart Finance - Backend API
-
-AI-Powered Personal Finance Application with OCR Receipt Scanning
-
-## Features
-
-- ✅ **User Authentication** (JWT-based)
-- ✅ **OCR Receipt Scanning** (Tesseract)
-- ✅ **AI Expense Categorization** (ML/NLP)
-- ✅ **Spending Prediction** (Time Series Analysis)
-- ✅ **Budget Alerts**
-- ✅ **Subscription Tracking**
-- ✅ **RESTful API**
-
-## Tech Stack
-
-- **Framework**: Flask
-- **Database**: SQLite (SQLAlchemy ORM)
-- **Authentication**: JWT (Flask-JWT-Extended)
-- **OCR**: Tesseract OCR + OpenCV
-- **ML**: Scikit-learn, NLTK
-
-## Installation
-
-### Prerequisites
-
-1. **Python 3.8+**
-2. **Tesseract OCR**
-   - Windows: Download from https://github.com/UB-Mannheim/tesseract/wiki
-   - Install to: `C:\Program Files\Tesseract-OCR\`
-   - Mac: `brew install tesseract`
-   - Linux: `sudo apt-get install tesseract-ocr`
-
-### Setup
-
-1. **Create virtual environment**
-```bash
-cd backend
-python -m venv venv
-```
 # Smart Finance Backend
 
 Flask backend for the Smart Finance mobile app. Provides OCR receipt processing, expense categorization, and analytics APIs.
@@ -200,4 +160,6 @@ curl -X POST https://finx-ugs5.onrender.com/api/upload-receipt \
 - Import errors: re-activate venv and reinstall requirements
 - Database issues: delete `finance.db` to recreate tables
 
+## License
 
+MIT

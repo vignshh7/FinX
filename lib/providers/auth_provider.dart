@@ -1,14 +1,11 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
-  
-  // TEMPORARY: Hardcoded credentials for development
-  static const String _tempUsername = 'admin';
-  static const String _tempPassword = 'admin';
-  static const bool _useTempAuth = false; // Set to true to bypass backend auth (not recommended)
   
   User? _user;
   bool _isLoading = false;
@@ -19,34 +16,85 @@ class AuthProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isAuthenticated => _isAuthenticated;
+  String get userName => _user?.name ?? 'User';
+  String get userEmail => _user?.email ?? '';
+  
+  // Save user data to SharedPreferences
+  Future<void> _saveUserData(User user) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_data', jsonEncode(user.toJson()));
+      if (kDebugMode) {
+        print('User data saved: ${user.name}');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error saving user data: $e');
+      }
+    }
+  }
+  
+  // Load user data from SharedPreferences
+  Future<User?> _loadUserData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userData = prefs.getString('user_data');
+      if (userData != null) {
+        final user = User.fromJson(jsonDecode(userData));
+        if (kDebugMode) {
+          print('User data loaded: ${user.name}');
+        }
+        return user;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error loading user data: $e');
+      }
+    }
+    return null;
+  }
+  
+  // Clear user data from SharedPreferences
+  Future<void> _clearUserData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('user_data');
+      if (kDebugMode) {
+        print('User data cleared');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error clearing user data: $e');
+      }
+    }
+  }
   
   // Check if user is already logged in
   Future<void> checkAuthStatus() async {
-    if (_useTempAuth) {
-      // For temporary auth, always consider authenticated
-      _isAuthenticated = true;
-      _user = User(
-        id: 1,
-        name: 'Admin User',
-        email: 'admin@finx.app',
-        token: 'temp_admin_token',
-      );
+    try {
+      final token = await _apiService.getToken();
+      _isAuthenticated = token != null && token.isNotEmpty;
+      if (_isAuthenticated) {
+        // Load saved user data
+        _user = await _loadUserData();
+        if (_user == null) {
+          // Fallback to placeholder if no saved data
+          _user = User(
+            id: 0,
+            name: 'User',
+            email: '',
+            token: token!,
+          );
+        }
+      }
       notifyListeners();
-      return;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error checking auth status: $e');
+      }
+      _isAuthenticated = false;
+      notifyListeners();
     }
-    
-    final token = await _apiService.getToken();
-    _isAuthenticated = token != null && token.isNotEmpty;
-    if (_isAuthenticated) {
-      // We don't currently fetch profile on app start; keep a lightweight placeholder.
-      _user = User(
-        id: 0,
-        name: 'User',
-        email: '',
-        token: token!,
-      );
-    }
-    notifyListeners();
   }
   
   // Register
@@ -61,9 +109,12 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = e.toString().replaceAll('Exception: ', '');
       _isLoading = false;
       notifyListeners();
+      if (kDebugMode) {
+        print('Registration error: $_error');
+      }
       return false;
     }
   }
@@ -75,47 +126,39 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
     
     try {
-      if (_useTempAuth) {
-        // Temporary authentication with hardcoded credentials
-        if (email == _tempUsername && password == _tempPassword) {
-          _user = User(
-            id: 1,
-            name: 'Admin User',
-            email: 'admin@finx.app',
-            token: 'temp_admin_token',
-          );
-          _isAuthenticated = true;
-          _isLoading = false;
-          notifyListeners();
-          if (kDebugMode) {
-            print('Temporary login successful: admin/admin');
-          }
-          return true;
-        } else {
-          throw Exception('Invalid credentials. Use admin/admin');
-        }
-      }
-      
-      // Real authentication (disabled for now)
       _user = await _apiService.login(email, password);
       _isAuthenticated = true;
+      
+      // Save user data to persistent storage
+      await _saveUserData(_user!);
+      
       _isLoading = false;
       notifyListeners();
+      if (kDebugMode) {
+        print('Login successful for user: ${_user?.name} (${_user?.email})');
+      }
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = e.toString().replaceAll('Exception: ', '');
       _isLoading = false;
       notifyListeners();
+      if (kDebugMode) {
+        print('Login error: $_error');
+      }
       return false;
     }
   }
   
-  // Logout
+  // Logout - Clear all user data
   Future<void> logout() async {
     await _apiService.deleteToken();
+    await _clearUserData();
     _user = null;
     _isAuthenticated = false;
     notifyListeners();
+    if (kDebugMode) {
+      print('User logged out successfully');
+    }
   }
   
   void clearError() {
