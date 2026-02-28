@@ -107,20 +107,10 @@ See [backend/README.md](backend/README.md) for API and deployment details.
 
 ## Built With
 
-<<<<<<< HEAD
 - **Flutter** - Mobile framework
 - **Flask** - Backend framework
 - **Tesseract** - OCR engine
 - **Scikit-learn** - Machine learning
 - **Provider** - State management
 - **FL Chart** - Data visualization
-=======
-- Flutter
-- Flask
-- Tesseract
-- Scikit-learn
-- Provider
-- FL Chart
-
->>>>>>> 559e90c25ea3287879ebafc8b7d5dc238fe75459
 
