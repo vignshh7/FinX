@@ -160,4 +160,4 @@ MIT License
 
 ## Author
 
-AI-Powered Smart Finance Team
+Vignesh
