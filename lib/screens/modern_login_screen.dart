@@ -21,6 +21,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
   
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -293,13 +294,11 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
   }
 
   Widget _buildLoginButton() {
-    final authProvider = Provider.of<AuthProvider>(context);
-    
     return SizedBox(
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
-        onPressed: authProvider.isLoading ? null : _login,
+        onPressed: _isLoading ? null : _login,
         style: ElevatedButton.styleFrom(
           backgroundColor: FintechColors.primaryBlue,
           foregroundColor: Colors.white,
@@ -308,7 +307,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
           ),
           elevation: 0,
         ),
-        child: authProvider.isLoading
+        child: _isLoading
             ? const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -417,21 +416,18 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Hide keyboard before login
-    FocusScope.of(context).unfocus();
+    setState(() => _isLoading = true);
     HapticFeedback.lightImpact();
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
-    // Clear previous errors
-    authProvider.clearError();
-    
     final success = await authProvider.login(
       _emailController.text.trim(),
       _passwordController.text,
     );
 
     if (!mounted) return;
+
+    setState(() => _isLoading = false);
 
     if (success) {
       HapticFeedback.heavyImpact();
@@ -440,7 +436,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
       );
     } else {
       HapticFeedback.heavyImpact();
-      _showErrorSnackBar(authProvider.error ?? 'Login failed. Please check your credentials and try again.');
+      _showErrorSnackBar(authProvider.error ?? 'Login failed. Please try again.');
     }
   }
 

@@ -5,7 +5,6 @@ import '../providers/expense_provider.dart';
 import '../providers/theme_provider.dart';
 import '../models/expense_model.dart';
 import '../models/category_model.dart';
-import 'home/home_screen.dart';
 
 class OCRResultScreen extends StatefulWidget {
   const OCRResultScreen({super.key});
@@ -24,8 +23,6 @@ class _OCRResultScreenState extends State<OCRResultScreen> {
   
   String _selectedCategory = ExpenseCategory.other;
   bool _isSaving = false;
-  bool _isRecategorizing = false;
-  Map<String, dynamic>? _aiCategorization;
 
   @override
   void initState() {
@@ -69,67 +66,6 @@ class _OCRResultScreenState extends State<OCRResultScreen> {
     }
   }
 
-  Future<void> _getAICategorization() async {
-    setState(() {
-      _isRecategorizing = true;
-    });
-
-    try {
-      final expenseProvider = Provider.of<ExpenseProvider>(context, listen: false);
-      final items = _itemsController.text.isEmpty 
-          ? null 
-          : _itemsController.text.split(',').map((e) => e.trim()).toList();
-      
-      final result = await expenseProvider.categorizeExpense(
-        storeName: _storeController.text.trim(),
-        items: items,
-      );
-
-      if (result != null && mounted) {
-        setState(() {
-          _aiCategorization = result;
-          // Update the selected category if confidence is high
-          if ((result['confidence'] ?? 0.0) > 0.8) {
-            _selectedCategory = result['category'] ?? ExpenseCategory.other;
-          }
-        });
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'AI suggests: ${result['category']} (${(result['confidence'] * 100).toInt()}% confident)',
-            ),
-            backgroundColor: Colors.blue,
-            action: SnackBarAction(
-              label: 'Use',
-              textColor: Colors.white,
-              onPressed: () {
-                setState(() {
-                  _selectedCategory = result['category'] ?? ExpenseCategory.other;
-                });
-              },
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to get AI categorization: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isRecategorizing = false;
-        });
-      }
-    }
-  }
-
   Future<void> _saveExpense() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -168,11 +104,7 @@ class _OCRResultScreenState extends State<OCRResultScreen> {
           backgroundColor: Colors.green,
         ),
       );
-      // Navigate to home screen and clear all previous routes
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-        (route) => false,
-      );
+      Navigator.of(context).pop();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -325,71 +257,6 @@ class _OCRResultScreenState extends State<OCRResultScreen> {
                     _selectedCategory = value!;
                   });
                 },
-              ),
-              const SizedBox(height: 12),
-
-              // AI Categorization Section
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.withOpacity(0.2)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.psychology, color: Colors.blue, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'AI Auto-Categorization',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.blue[700],
-                              fontSize: 14,
-                            ),
-                          ),
-                          if (_aiCategorization != null) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              'Suggested: ${_aiCategorization!['category']} (${(_aiCategorization!['confidence'] * 100).toInt()}% confident)',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: _isRecategorizing ? null : _getAICategorization,
-                      icon: _isRecategorizing 
-                          ? SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Icon(Icons.auto_awesome, size: 16),
-                      label: Text(
-                        _isRecategorizing ? 'Analyzing...' : 'Analyze',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        minimumSize: Size.zero,
-                      ),
-                    ),
-                  ],
-                ),
               ),
               const SizedBox(height: 16),
 

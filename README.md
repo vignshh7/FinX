@@ -1,102 +1,118 @@
-# Smart Finance
+# Smart Finance - AI-Powered Personal Finance Mobile App
 
-AI-powered personal finance mobile app with receipt OCR, expense categorization, and spending insights.
+Complete end-to-end mobile application with OCR receipt scanning, AI expense categorization, and spending predictions.
 
-## Features
+## 🎯 Features
 
 ### Mobile App (Flutter)
-- User authentication (JWT with secure storage)
-- Dashboard (monthly summary, charts, predictions, alerts)
-- Receipt scanner (camera/gallery with image compression)
-- OCR result review (manual correction, category selection)
-- Expense history (filter, search, categorization)
-- Subscription tracker (recurring payments, renewal reminders)
-- Settings (budget, currency, dark mode)
+- ✅ **User Authentication** (JWT with secure storage)
+- ✅ **Dashboard** (Monthly summary, charts, predictions, alerts)
+- ✅ **Receipt Scanner** (Camera/Gallery with image compression)
+- ✅ **OCR Result Review** (Manual correction, category selection)
+- ✅ **Expense History** (Filter, search, categorization)
+- ✅ **Subscription Tracker** (Recurring payments, renewal reminders)
+- ✅ **Settings** (Budget, currency, dark mode)
 
 ### Backend API (Flask + Python)
-- OCR processing (Tesseract with image preprocessing)
-- ML categorization (NLP-based expense classification)
-- Spending prediction (time series analysis)
-- Budget alerts (notifications)
-- REST API (JWT authentication)
+- ✅ **OCR Processing** (Tesseract with image preprocessing)
+- ✅ **ML Categorization** (NLP-based expense classification)
+- ✅ **Spending Prediction** (Time series analysis)
+- ✅ **Budget Alerts** (Smart notifications)
+- ✅ **RESTful API** (JWT authentication)
 
-## Architecture
+## 🏗️ Architecture
 
 ```
 Mobile App (Flutter)
-      |
+      ↓
    REST APIs
-      |
+      ↓
 Backend (Flask)
-      |
-OCR + ML + Database (SQLite)
+      ↓
+┌─────────┬──────────┬─────────┐
+│   OCR   │    ML    │Database │
+│Tesseract│Sklearn   │ SQLite  │
+└─────────┴──────────┴─────────┘
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Flutter SDK 3.10.7+
-- Python 3.8+
-- Tesseract OCR
-- Android Studio or Xcode
+- **Flutter SDK** (3.10.7+)
+- **Python** (3.8+)
+- **Tesseract OCR**
+- **Android Studio** / **Xcode** (for mobile development)
 
-### Backend setup
+### 1. Backend Setup
 
 ```bash
 cd backend
 
+# Create virtual environment
 python -m venv venv
 
+# Activate (Windows)
 venv\Scripts\activate
 
+# Install dependencies
 pip install -r requirements.txt
 
+# Configure environment
 cp .env.example .env
-# Update .env with your Tesseract path
+# Edit .env with your Tesseract path
 
+# Run server
 python run.py
 ```
 
-Default backend URL: `https://finx-ugs5.onrender.com`
+Backend runs at: `http://localhost:5000`
 
-### Mobile app setup
+### 2. Mobile App Setup
 
 ```bash
+# Get Flutter dependencies
 flutter pub get
 
 # Update backend URL in lib/services/api_service.dart
-# Set baseUrl to your Render URL for production or your backend IP for local testing
+# Change baseUrl to your backend IP (use computer IP, not localhost for device testing)
 
+# Run on emulator/device
 flutter run
 ```
 
-## How It Works
+## 🎨 Key Features Explained
 
-### OCR receipt flow
-1. User captures or uploads a receipt image.
-2. Image is compressed and sent to the backend.
-3. Backend preprocesses the image (grayscale, denoise, threshold).
-4. Tesseract extracts text.
-5. Regex patterns extract structured data.
-6. ML model predicts the expense category.
-7. Results return to the app for review.
+### 1. OCR Receipt Scanning (CORE FEATURE)
 
-### Expense categorization
-- Algorithm: Naive Bayes classifier
+**How it works:**
+1. User captures/uploads receipt image
+2. Image is compressed and sent to backend
+3. Backend preprocesses image (grayscale, denoise, threshold)
+4. Tesseract extracts text
+5. Regex patterns extract structured data
+6. ML model predicts expense category
+7. Results sent back to app for review
+
+### 2. AI Expense Categorization
+
+**ML Model:**
+- Algorithm: Naive Bayes Classifier
 - Features: TF-IDF vectorization
 - Categories: Food, Travel, Shopping, Bills, Entertainment, Other
 
-### Spending prediction
+### 3. Spending Prediction
+
+**Algorithm:**
 - Weighted moving average (last 6 months)
 - Trend analysis and adjustment
 - Confidence scoring
 
-## Documentation
+## 📚 Full Documentation
 
-See [backend/README.md](backend/README.md) for API and deployment details.
+See [backend/README.md](backend/README.md) for complete API documentation and deployment guide.
 
-## Testing
+## 🧪 Testing
 
 1. Run backend: `python run.py`
 2. Run app: `flutter run`
@@ -105,22 +121,12 @@ See [backend/README.md](backend/README.md) for API and deployment details.
 5. Scan receipt
 6. View dashboard
 
-## Built With
+## 📦 Built With
 
-<<<<<<< HEAD
 - **Flutter** - Mobile framework
 - **Flask** - Backend framework
 - **Tesseract** - OCR engine
 - **Scikit-learn** - Machine learning
 - **Provider** - State management
 - **FL Chart** - Data visualization
-=======
-- Flutter
-- Flask
-- Tesseract
-- Scikit-learn
-- Provider
-- FL Chart
-
->>>>>>> 559e90c25ea3287879ebafc8b7d5dc238fe75459
 

@@ -7,9 +7,6 @@ import 'providers/expense_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/subscription_provider.dart';
 import 'providers/income_provider.dart';
-import 'providers/budget_provider.dart';
-import 'providers/savings_provider.dart';
-import 'providers/bill_reminder_provider.dart';
 import 'screens/modern_login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'services/api_service.dart';
@@ -32,9 +29,6 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ExpenseProvider()),
         ChangeNotifierProvider(create: (_) => SubscriptionProvider()),
         ChangeNotifierProvider(create: (_) => IncomeProvider()),
-        ChangeNotifierProvider(create: (_) => BudgetProvider()),
-        ChangeNotifierProvider(create: (_) => SavingsProvider()),
-        ChangeNotifierProvider(create: (_) => BillReminderProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {

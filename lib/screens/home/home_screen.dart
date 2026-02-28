@@ -3,9 +3,9 @@ import 'package:flutter/services.dart';
 import '../../core/theme/fintech_colors.dart';
 import '../../core/theme/fintech_typography.dart';
 import 'modern_dashboard_screen.dart';
-import '../expense_history_screen_new.dart';
+import '../expense_history_screen.dart';
 import '../modern_receipt_scanner_screen.dart';
-import '../modern_ai_insights_screen_new.dart';
+import '../modern_ai_insights_screen.dart';
 import '../settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -58,16 +58,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: false,
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 200),
-        switchInCurve: Curves.easeInOut,
-        switchOutCurve: Curves.easeInOut,
-        child: IndexedStack(
-          key: ValueKey<int>(_selectedIndex),
-          index: _selectedIndex,
-          children: _screens,
-        ),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _screens,
       ),
       bottomNavigationBar: _buildModernBottomNav(),
     );
@@ -83,37 +76,40 @@ class _HomeScreenState extends State<HomeScreen> {
     final navShadow = Colors.black.withOpacity(isDark ? 0.35 : 0.10);
 
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
-    return Container(
-      decoration: BoxDecoration(
-        color: navBackground,
-        border: Border(
-          top: BorderSide(
-            color: navBorder,
-            width: 0.5,
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: BoxDecoration(
+          color: navBackground,
+          border: Border(
+            top: BorderSide(
+              color: navBorder,
+              width: 0.5,
+            ),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: navShadow,
+              blurRadius: 20,
+              offset: const Offset(0, -5),
+            ),
+          ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: navShadow,
-            blurRadius: 20,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 12,
-        bottom: bottomInset > 0 ? bottomInset : 12,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: _navItems.asMap().entries.map((entry) {
-          final index = entry.key;
-          final item = entry.value;
-          final isSelected = _selectedIndex == index;
-          return _buildNavItem(item, index, isSelected);
-        }).toList(),
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 8,
+          bottom: 8 + bottomInset,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: _navItems.asMap().entries.map((entry) {
+            final index = entry.key;
+            final item = entry.value;
+            final isSelected = _selectedIndex == index;
+            return _buildNavItem(item, index, isSelected);
+          }).toList(),
+        ),
       ),
     );
   }

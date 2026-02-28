@@ -443,7 +443,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final categoryColors = {
       'Food': cs.secondary,
       'Transport': cs.primary,
-      'Shopping': cs.tertiary,
+      'Shopping': cs.tertiary ?? cs.primary,
       'Entertainment': cs.secondaryContainer,
       'Bills': cs.error,
       'Healthcare': cs.primaryContainer,

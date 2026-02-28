@@ -46,39 +46,18 @@ def create_income():
         user_id = get_jwt_identity()
         data = request.get_json() or {}
 
-        required_fields = ['source', 'amount', 'date']
+        required_fields = ['source', 'amount', 'date', 'category']
         if not all(field in data for field in required_fields):
-            return jsonify({'message': 'Missing required fields: source, amount, date'}), 400
-
-        # Type conversions with validation
-        try:
-            amount = float(data['amount'])
-            if amount <= 0:
-                return jsonify({'message': 'Amount must be positive'}), 400
-        except (ValueError, TypeError):
-            return jsonify({'message': 'Invalid amount format'}), 400
-        
-        # Parse date
-        try:
-            date_str = data['date'].split('T')[0] if 'T' in data['date'] else data['date']
-            date_obj = datetime.fromisoformat(date_str)
-        except (ValueError, AttributeError):
-            return jsonify({'message': 'Invalid date format. Use YYYY-MM-DD'}), 400
-
-        # Currency defaults to INR
-        currency = str(data.get('currency', 'INR')).strip().upper()
-        if len(currency) != 3:
-            currency = 'INR'
+            return jsonify({'message': 'Missing required fields'}), 400
 
         income = Income(
             user_id=user_id,
-            source=str(data['source']).strip(),
-            category=str(data.get('category', 'Other')).strip(),
-            amount=amount,
-            currency=currency,
-            date=date_obj,
+            source=data['source'],
+            category=data.get('category', 'Other'),
+            amount=float(data['amount']),
+            date=datetime.fromisoformat(data['date'].split('T')[0]),
             is_recurring=bool(data.get('is_recurring', False)),
-            notes=str(data.get('notes', '')).strip() if data.get('notes') else None,
+            notes=data.get('notes'),
         )
 
         db.session.add(income)
@@ -88,61 +67,6 @@ def create_income():
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': f'Failed to create income: {str(e)}'}), 500
-
-
-@incomes_bp.route('/incomes/<int:income_id>', methods=['PUT'])
-@jwt_required()
-def update_income(income_id: int):
-    """Update an income entry."""
-    try:
-        user_id = get_jwt_identity()
-        data = request.get_json() or {}
-
-        income = Income.query.filter_by(id=income_id, user_id=user_id).first()
-        if not income:
-            return jsonify({'message': 'Income not found'}), 404
-
-        # Update fields if provided
-        if 'source' in data:
-            income.source = str(data['source']).strip()
-        
-        if 'amount' in data:
-            try:
-                amount = float(data['amount'])
-                if amount <= 0:
-                    return jsonify({'message': 'Amount must be positive'}), 400
-                income.amount = amount
-            except (ValueError, TypeError):
-                return jsonify({'message': 'Invalid amount format'}), 400
-        
-        if 'currency' in data:
-            currency = str(data['currency']).strip().upper()
-            if len(currency) == 3:
-                income.currency = currency
-        
-        if 'date' in data:
-            try:
-                date_str = data['date'].split('T')[0] if 'T' in data['date'] else data['date']
-                income.date = datetime.fromisoformat(date_str)
-            except (ValueError, AttributeError):
-                return jsonify({'message': 'Invalid date format. Use YYYY-MM-DD'}), 400
-        
-        if 'category' in data:
-            income.category = str(data['category']).strip()
-        
-        if 'is_recurring' in data:
-            income.is_recurring = bool(data['is_recurring'])
-        
-        if 'notes' in data:
-            income.notes = str(data['notes']).strip() if data['notes'] else None
-        
-        income.updated_at = datetime.utcnow()
-        db.session.commit()
-
-        return jsonify(income.to_dict()), 200
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'message': f'Failed to update income: {str(e)}'}), 500
 
 
 @incomes_bp.route('/incomes/<int:income_id>', methods=['DELETE'])

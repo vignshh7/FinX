@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -17,7 +16,7 @@ class ReceiptScannerScreen extends StatefulWidget {
 
 class _ReceiptScannerScreenState extends State<ReceiptScannerScreen> {
   final ImagePicker _picker = ImagePicker();
-  XFile? _selectedImage;
+  File? _selectedImage;
   bool _isProcessing = false;
 
   Future<void> _captureFromCamera() async {
@@ -31,7 +30,7 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen> {
 
       if (photo != null) {
         setState(() {
-          _selectedImage = photo;
+          _selectedImage = File(photo.path);
         });
       }
     } catch (e) {
@@ -50,7 +49,7 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen> {
 
       if (image != null) {
         setState(() {
-          _selectedImage = image;
+          _selectedImage = File(image.path);
         });
       }
     } catch (e) {
@@ -58,10 +57,7 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen> {
     }
   }
 
-  Future<XFile> _compressImage(XFile file) async {
-    // On web, skip compression (not supported)
-    if (kIsWeb) return file;
-    
+  Future<File> _compressImage(File file) async {
     // Read image
     final bytes = await file.readAsBytes();
     img.Image? image = img.decodeImage(bytes);
@@ -85,7 +81,7 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen> {
     final compressedFile = File('${tempDir.path}/compressed_${DateTime.now().millisecondsSinceEpoch}.jpg');
     await compressedFile.writeAsBytes(compressedBytes);
 
-    return XFile(compressedFile.path);
+    return compressedFile;
   }
 
   Future<void> _uploadReceipt() async {
@@ -205,15 +201,10 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: kIsWeb
-                      ? Image.network(
-                          _selectedImage!.path,
-                          fit: BoxFit.contain,
-                        )
-                      : Image.file(
-                          File(_selectedImage!.path),
-                          fit: BoxFit.contain,
-                        ),
+                  child: Image.file(
+                    _selectedImage!,
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),

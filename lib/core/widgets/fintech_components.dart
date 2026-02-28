@@ -29,18 +29,15 @@ class FintechCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
     Widget cardChild = Container(
       decoration: BoxDecoration(
         gradient: gradient,
-        color: gradient == null ? (backgroundColor ?? theme.cardColor) : null,
+        color: gradient == null ? (backgroundColor ?? FintechColors.cardBackground) : null,
         borderRadius: BorderRadius.circular(borderRadius),
         border: border,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+            color: FintechColors.shadowColor,
             blurRadius: elevation * 2,
             offset: Offset(0, elevation),
           ),
@@ -92,43 +89,37 @@ class QuickActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textColorDefault = textColor ?? theme.colorScheme.onSurface;
-    
     return FintechCard(
       onTap: onTap,
       gradient: gradient,
       backgroundColor: backgroundColor,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
-              color: (iconColor ?? FintechColors.primaryBlue).withOpacity(0.12),
-              borderRadius: BorderRadius.circular(14),
+              color: (iconColor ?? FintechColors.primaryBlue).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               icon,
-              size: 26,
+              size: 24,
               color: iconColor ?? FintechColors.primaryBlue,
             ),
           ),
-          const SizedBox(height: 10),
-          Flexible(
-            child: Text(
-              label,
-              style: FintechTypography.labelMedium.copyWith(
-                color: textColorDefault,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.visible,
+          const SizedBox(height: 12),
+          Text(
+            label,
+            style: FintechTypography.labelMedium.copyWith(
+              color: textColor ?? FintechColors.textPrimary,
+              fontWeight: FontWeight.w600,
             ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -161,10 +152,6 @@ class FeatureCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textColor = theme.colorScheme.onSurface;
-    final secondaryTextColor = theme.colorScheme.onSurface.withOpacity(0.6);
-    
     return FintechCard(
       onTap: isComingSoon ? null : onTap,
       gradient: gradient,
@@ -196,7 +183,7 @@ class FeatureCard extends StatelessWidget {
                     Text(
                       title,
                       style: FintechTypography.h6.copyWith(
-                        color: textColor,
+                        color: FintechColors.textPrimary,
                       ),
                     ),
                     if (isComingSoon) ...[
@@ -222,7 +209,7 @@ class FeatureCard extends StatelessWidget {
                 Text(
                   subtitle,
                   style: FintechTypography.bodySmall.copyWith(
-                    color: secondaryTextColor,
+                    color: FintechColors.textSecondary,
                   ),
                 ),
               ],
@@ -236,7 +223,7 @@ class FeatureCard extends StatelessWidget {
             Icon(
               Icons.arrow_forward_ios,
               size: 16,
-              color: isComingSoon ? theme.colorScheme.onSurface.withOpacity(0.3) : secondaryTextColor,
+              color: isComingSoon ? FintechColors.textMuted : FintechColors.textSecondary,
             ),
         ],
       ),
@@ -271,12 +258,8 @@ class StatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textColor = theme.colorScheme.onSurface;
-    final secondaryTextColor = theme.colorScheme.onSurface.withOpacity(0.6);
-    
     Color getTrendColor() {
-      if (trendValue == null) return secondaryTextColor;
+      if (trendValue == null) return FintechColors.textSecondary;
       return trendValue! >= 0 ? FintechColors.successColor : FintechColors.errorColor;
     }
 
@@ -298,14 +281,14 @@ class StatsCard extends StatelessWidget {
               Text(
                 title,
                 style: FintechTypography.labelMedium.copyWith(
-                  color: secondaryTextColor,
+                  color: FintechColors.textSecondary,
                 ),
               ),
               if (icon != null)
                 Icon(
                   icon,
                   size: 20,
-                  color: iconColor ?? secondaryTextColor,
+                  color: iconColor ?? FintechColors.textMuted,
                 ),
             ],
           ),
@@ -315,7 +298,7 @@ class StatsCard extends StatelessWidget {
           Text(
             value,
             style: FintechTypography.currencyMedium.copyWith(
-              color: valueColor ?? textColor,
+              color: valueColor ?? FintechColors.textPrimary,
             ),
           ),
           
@@ -328,7 +311,7 @@ class StatsCard extends StatelessWidget {
                     child: Text(
                       subtitle!,
                       style: FintechTypography.bodySmall.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                        color: FintechColors.textMuted,
                       ),
                     ),
                   ),
@@ -373,9 +356,6 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textColor = theme.colorScheme.onSurface;
-    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
@@ -384,7 +364,7 @@ class SectionHeader extends StatelessWidget {
           Text(
             title,
             style: FintechTypography.h5.copyWith(
-              color: textColor,
+              color: FintechColors.textPrimary,
               fontWeight: FontWeight.w700,
             ),
           ),

@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ThemeProvider with ChangeNotifier {
   bool _isDarkMode = true; // Default to dark mode ON
-  String _currency = 'INR';
+  String _currency = 'USD';
   double _monthlyBudget = 5000.0; // Default budget
   bool _isInitialized = false;
   
@@ -11,25 +11,6 @@ class ThemeProvider with ChangeNotifier {
   String get currency => _currency;
   double get monthlyBudget => _monthlyBudget;
   bool get isInitialized => _isInitialized;
-  
-  String get currencySymbol {
-    switch (_currency) {
-      case 'USD':
-        return '\$';
-      case 'EUR':
-        return '€';
-      case 'GBP':
-        return '£';
-      case 'INR':
-        return '₹';
-      case 'JPY':
-        return '¥';
-      case 'CNY':
-        return '¥';
-      default:
-        return '\$';
-    }
-  }
   
   ThemeProvider() {
     _loadPreferences();
@@ -39,7 +20,7 @@ class ThemeProvider with ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       _isDarkMode = prefs.getBool('isDarkMode') ?? true; // Default to dark
-      _currency = prefs.getString('currency') ?? 'INR';
+      _currency = prefs.getString('currency') ?? 'USD';
       _monthlyBudget = prefs.getDouble('monthlyBudget') ?? 5000.0;
       _isInitialized = true;
       if (kDebugMode) {
@@ -58,21 +39,18 @@ class ThemeProvider with ChangeNotifier {
   Future<void> toggleTheme() async {
     try {
       _isDarkMode = !_isDarkMode;
-      notifyListeners(); // Notify immediately for instant UI update
-      
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('isDarkMode', _isDarkMode);
-      
       if (kDebugMode) {
-        print('Theme toggled successfully: Dark=$_isDarkMode');
+        print('Theme toggled: Dark=$_isDarkMode');
       }
+      notifyListeners();
     } catch (e) {
       if (kDebugMode) {
         print('Error toggling theme: $e');
       }
       // Revert on error
       _isDarkMode = !_isDarkMode;
-      notifyListeners();
     }
   }
   

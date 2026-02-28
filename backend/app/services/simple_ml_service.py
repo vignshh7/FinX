@@ -13,9 +13,7 @@ class SimpleExpenseCategorizer:
             'Food': [
                 'restaurant', 'mcdonalds', 'kfc', 'pizza', 'burger', 'subway', 'starbucks',
                 'grocery', 'walmart', 'target', 'kroger', 'safeway', 'publix', 'costco',
-                'food', 'meal', 'dining', 'cafe', 'deli', 'bakery', 'market', 'supermarket',
-                'pollo', 'campero', 'chicken', 'grill', 'bistro', 'eatery', 'kitchen',
-                'dominos', 'wendys', 'taco bell', 'chipotle', 'panera', 'chick-fil-a'
+                'food', 'meal', 'dining', 'cafe', 'deli', 'bakery', 'market', 'supermarket'
             ],
             'Transport': [
                 'gas', 'fuel', 'uber', 'lyft', 'taxi', 'bus', 'train', 'metro', 'parking',

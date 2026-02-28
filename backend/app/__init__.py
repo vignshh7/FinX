@@ -26,13 +26,7 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
     jwt.init_app(app)
-    
-    # CORS Configuration - works for both local and production
-    cors_origins = os.getenv('CORS_ORIGINS', '*')
-    if cors_origins == '*':
-        CORS(app)
-    else:
-        CORS(app, origins=cors_origins.split(','))
+    CORS(app)
     
     # Create upload folder
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -45,9 +39,6 @@ def create_app():
     from app.routes.budget import budget_bp
     from app.routes.income import incomes_bp
     from app.routes.analytics import analytics_bp
-    from app.routes.ai_routes import ai_bp
-    from app.routes.savings_goals import savings_goals_bp
-    from app.routes.bill_reminders import bill_reminders_bp
     
     app.register_blueprint(auth_bp, url_prefix='/api')
     app.register_blueprint(expenses_bp, url_prefix='/api')
@@ -56,45 +47,17 @@ def create_app():
     app.register_blueprint(budget_bp, url_prefix='/api')
     app.register_blueprint(incomes_bp, url_prefix='/api')
     app.register_blueprint(analytics_bp, url_prefix='/api')
-    app.register_blueprint(ai_bp, url_prefix='/api')
-    app.register_blueprint(savings_goals_bp, url_prefix='/api')
-    app.register_blueprint(bill_reminders_bp, url_prefix='/api')
     
     # Create tables
     with app.app_context():
         db.create_all()
-        # Migration: add new columns to existing tables if missing
-        _run_migrations(db)
     
     @app.route('/')
     def index():
         return {'message': 'Smart Finance API', 'version': '1.0.0'}
-    
-    @app.route('/api/health')
-    def health():
-        return {'status': 'healthy', 'service': 'finx-backend'}, 200
     
     return app
 
 if __name__ == '__main__':
     app = create_app()
     app.run(debug=True, host='0.0.0.0', port=5000)
-
-
-def _run_migrations(db):
-    """Add missing columns to existing tables without full Alembic migration."""
-    try:
-        with db.engine.connect() as conn:
-            # Check and add payment_method to bill_reminders
-            result = conn.execute(
-                db.text("PRAGMA table_info(bill_reminders)")
-            )
-            existing_columns = {row[1] for row in result}
-            if 'payment_method' not in existing_columns:
-                conn.execute(
-                    db.text("ALTER TABLE bill_reminders ADD COLUMN payment_method VARCHAR(50)")
-                )
-                conn.commit()
-                print("Migration: added payment_method column to bill_reminders")
-    except Exception as e:
-        print(f"Migration warning (non-fatal): {e}")

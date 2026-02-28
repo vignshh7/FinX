@@ -70,14 +70,9 @@ dependencies:
   lottie: ^3.0.0
   flutter_animate: ^4.5.0
   
-  # PDF Generation
-  pdf: ^3.11.0
-
   # Utils
   path_provider: ^2.1.2
   permission_handler: ^11.3.0
-  share_plus: ^10.0.0
-  file_picker: ^8.0.0
 
 dev_dependencies:
   flutter_test:
