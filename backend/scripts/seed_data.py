@@ -56,7 +56,7 @@ def seed_budget(token):
     _request(
         "/budget",
         method="PUT",
-        data={"monthly_limit": 2500, "currency": "USD"},
+        data={"monthly_limit": 250000, "currency": "INR"},
         token=token,
     )
 
@@ -65,11 +65,13 @@ def seed_budget(token):
         method="PUT",
         data={
             "category_budgets": [
-                {"category": "Food", "monthly_limit": 600},
-                {"category": "Travel", "monthly_limit": 300},
-                {"category": "Shopping", "monthly_limit": 400},
-                {"category": "Bills", "monthly_limit": 700},
-                {"category": "Entertainment", "monthly_limit": 250},
+                {"category": "Food", "monthly_limit": 60000},
+                {"category": "Travel", "monthly_limit": 30000},
+                {"category": "Shopping", "monthly_limit": 45000},
+                {"category": "Bills", "monthly_limit": 70000},
+                {"category": "Entertainment", "monthly_limit": 25000},
+                {"category": "Healthcare", "monthly_limit": 15000},
+                {"category": "Education", "monthly_limit": 12000},
             ]
         },
         token=token,
@@ -78,44 +80,62 @@ def seed_budget(token):
 
 def seed_expenses(token):
     today = date.today()
-    expenses = [
+    base_items = [
         {
-            "store": "Walmart",
-            "amount": 58.25,
+            "store": "Big Bazaar",
+            "amount": 5800,
             "category": "Food",
-            "date": str(today - timedelta(days=2)),
-            "items": ["Milk", "Bread", "Eggs"],
+            "items": ["Groceries", "Fresh Produce", "Dairy"],
             "raw_ocr_text": "Sample OCR text",
         },
         {
             "store": "Uber",
-            "amount": 22.40,
+            "amount": 2200,
             "category": "Travel",
-            "date": str(today - timedelta(days=5)),
             "items": ["Ride"],
         },
         {
-            "store": "Best Buy",
-            "amount": 199.99,
+            "store": "Croma",
+            "amount": 19999,
             "category": "Shopping",
-            "date": str(today - timedelta(days=8)),
             "items": ["Headphones"],
         },
         {
             "store": "Netflix",
-            "amount": 15.99,
+            "amount": 999,
             "category": "Entertainment",
-            "date": str(today - timedelta(days=12)),
             "items": ["Subscription"],
         },
         {
-            "store": "Electric Co",
-            "amount": 92.10,
+            "store": "Electricity Board",
+            "amount": 9210,
             "category": "Bills",
-            "date": str(today - timedelta(days=15)),
             "items": ["Electricity"],
         },
+        {
+            "store": "Apollo Pharmacy",
+            "amount": 3200,
+            "category": "Healthcare",
+            "items": ["Medicines"],
+        },
+        {
+            "store": "Coursera",
+            "amount": 4500,
+            "category": "Education",
+            "items": ["Course Subscription"],
+        },
     ]
+
+    expenses = []
+    # Create expenses across the last 6 months to drive predictions/insights.
+    for month_offset in range(0, 6):
+        month_anchor = today - timedelta(days=30 * month_offset)
+        for idx, item in enumerate(base_items):
+            entry = dict(item)
+            entry["date"] = str(month_anchor - timedelta(days=2 + idx * 3))
+            # Slightly vary amounts per month to show trends
+            entry["amount"] = round(entry["amount"] * (1.0 + (month_offset * 0.08)), 2)
+            expenses.append(entry)
 
     created = []
     for item in expenses:
@@ -145,24 +165,37 @@ def seed_subscriptions(token):
 
 def seed_income(token):
     today = date.today()
-    incomes = [
-        {
-            "source": "Salary",
-            "category": "Primary",
-            "amount": 4200,
-            "date": str(today - timedelta(days=1)),
-            "is_recurring": True,
-            "notes": "Monthly salary",
-        },
-        {
-            "source": "Freelance",
-            "category": "Side",
-            "amount": 600,
-            "date": str(today - timedelta(days=10)),
-            "is_recurring": False,
-            "notes": "Design project",
-        },
-    ]
+    incomes = []
+    for month_offset in range(0, 6):
+        month_anchor = today - timedelta(days=30 * month_offset)
+        incomes.extend(
+            [
+                {
+                    "source": "Salary",
+                    "category": "Primary",
+                    "amount": 220000 + (month_offset * 5000),
+                    "date": str(month_anchor - timedelta(days=1)),
+                    "is_recurring": True,
+                    "notes": "Monthly salary",
+                },
+                {
+                    "source": "Freelance",
+                    "category": "Side",
+                    "amount": 45000 + (month_offset * 2000),
+                    "date": str(month_anchor - timedelta(days=10)),
+                    "is_recurring": False,
+                    "notes": "Design project",
+                },
+                {
+                    "source": "Investments",
+                    "category": "Passive",
+                    "amount": 18000 + (month_offset * 1200),
+                    "date": str(month_anchor - timedelta(days=18)),
+                    "is_recurring": True,
+                    "notes": "Mutual fund dividends",
+                },
+            ]
+        )
     for item in incomes:
         _request("/incomes", method="POST", data=item, token=token)
 
