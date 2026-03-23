@@ -24,7 +24,7 @@ def upload_receipt():
     This is the CORE FEATURE of the application
     """
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         
         # Check if file is present
         if 'receipt' not in request.files:

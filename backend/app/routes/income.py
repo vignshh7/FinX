@@ -13,7 +13,7 @@ incomes_bp = Blueprint('incomes', __name__)
 def get_incomes():
     """Get all incomes for authenticated user, optional month/year filters."""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
 
         query = Income.query.filter_by(user_id=user_id)
 
@@ -43,7 +43,7 @@ def get_incomes():
 def create_income():
     """Create a new income entry."""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         data = request.get_json() or {}
 
         required_fields = ['source', 'amount', 'date', 'category']
@@ -74,7 +74,7 @@ def create_income():
 def delete_income(income_id: int):
     """Delete an income entry."""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
 
         income = Income.query.filter_by(id=income_id, user_id=user_id).first()
         if not income:

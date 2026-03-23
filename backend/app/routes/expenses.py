@@ -12,7 +12,7 @@ expenses_bp = Blueprint('expenses', __name__)
 def get_expenses():
     """Get all expenses for authenticated user with optional filters"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         
         # Build query
         query = Expense.query.filter_by(user_id=user_id)
@@ -45,7 +45,7 @@ def get_expenses():
 def create_expense():
     """Create a new expense"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         data = request.get_json()
         
         # Validation
@@ -78,7 +78,7 @@ def create_expense():
 def delete_expense(expense_id):
     """Delete an expense"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         
         expense = Expense.query.filter_by(id=expense_id, user_id=user_id).first()
         if not expense:
@@ -103,7 +103,7 @@ def submit_expense_feedback(expense_id: int):
     periodic model retraining while immediately improving the expense record.
     """
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         data = request.get_json() or {}
 
         expense = Expense.query.filter_by(id=expense_id, user_id=user_id).first()
@@ -140,7 +140,7 @@ def submit_expense_feedback(expense_id: int):
 def predict_spending():
     """Get AI prediction for next month's spending"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         
         from app.services.prediction_service import PredictionService
         prediction = PredictionService.predict_next_month_spending(user_id, db)

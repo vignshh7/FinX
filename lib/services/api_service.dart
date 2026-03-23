@@ -15,7 +15,7 @@ class ApiService {
   // - Android emulator: http://10.0.2.2:5000/api
   // - Physical device:  http://<your-computer-lan-ip>:5000/api
   static const String _baseUrlPrefKey = 'api_base_url';
-  static const String _defaultBaseUrl = 'http://10.0.2.2:5000/api';
+  static const String _defaultBaseUrl = 'https://finx-i7m6.onrender.com/api';
   static String _baseUrl = _defaultBaseUrl;
 
   static String get baseUrl => _baseUrl;

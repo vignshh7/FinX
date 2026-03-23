@@ -10,7 +10,7 @@ budget_bp = Blueprint('budget', __name__)
 def get_budget():
     """Get budget for authenticated user"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         
         budget = Budget.query.filter_by(user_id=user_id).first()
         
@@ -27,7 +27,7 @@ def get_budget():
 def update_budget():
     """Create or update budget"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         data = request.get_json()
         
         if 'monthly_limit' not in data:
@@ -62,7 +62,7 @@ def update_budget():
 def get_category_budgets():
     """Get per-category budgets for the authenticated user."""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
 
         rows = CategoryBudget.query.filter_by(user_id=user_id).all()
         return jsonify({'category_budgets': [cb.to_dict() for cb in rows]}), 200
@@ -79,7 +79,7 @@ def upsert_category_budgets():
     entry has `category` and `monthly_limit`.
     """
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         data = request.get_json() or {}
         items = data.get('category_budgets') or []
 
@@ -111,3 +111,17 @@ def upsert_category_budgets():
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': f'Failed to update category budgets: {str(e)}'}), 500
+
+
+@budget_bp.route('/savings-goals', methods=['GET'])
+@jwt_required()
+def get_savings_goals():
+    """Return a placeholder list of savings goals.
+
+    This keeps the endpoint stable for clients even if the goals feature
+    is not yet backed by storage.
+    """
+    try:
+        return jsonify({'savings_goals': []}), 200
+    except Exception as e:
+        return jsonify({'message': f'Failed to fetch savings goals: {str(e)}'}), 500

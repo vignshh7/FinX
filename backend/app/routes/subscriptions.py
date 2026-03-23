@@ -11,7 +11,7 @@ subscriptions_bp = Blueprint('subscriptions', __name__)
 def get_subscriptions():
     """Get all subscriptions for authenticated user"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         
         subscriptions = Subscription.query.filter_by(user_id=user_id).all()
         
@@ -27,7 +27,7 @@ def get_subscriptions():
 def create_subscription():
     """Create a new subscription"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         data = request.get_json()
         
         # Validation
@@ -57,7 +57,7 @@ def create_subscription():
 def delete_subscription(subscription_id):
     """Delete a subscription"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         
         subscription = Subscription.query.filter_by(id=subscription_id, user_id=user_id).first()
         if not subscription:
