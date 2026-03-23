@@ -20,7 +20,7 @@ class PredictionService:
         ).filter(
             Expense.user_id == user_id,
             Expense.date >= six_months_ago
-        ).group_by('month').all()
+        ).group_by('month').order_by('month').all()
         
         if not monthly_totals:
             return {
@@ -30,14 +30,24 @@ class PredictionService:
             }
         
         # Extract amounts
-        amounts = [total for _, total in monthly_totals]
+        amounts = [float(total) for _, total in monthly_totals if total is not None]
+
+        if not amounts:
+            return {
+                'predicted_amount': 0.0,
+                'confidence': 0.0,
+                'based_on_months': 0
+            }
         
         # Calculate simple moving average
         if len(amounts) >= 3:
-            # Use weighted average (recent months have more weight)
-            weights = np.array([1, 2, 3])[-len(amounts):]
+            # Use weighted average on the most recent months.
+            # This avoids shape mismatch when more than 3 months are present.
+            recent_window = min(3, len(amounts))
+            recent_amounts = np.array(amounts[-recent_window:], dtype=float)
+            weights = np.arange(1, recent_window + 1, dtype=float)
             weights = weights / weights.sum()
-            predicted_amount = np.average(amounts, weights=weights)
+            predicted_amount = np.average(recent_amounts, weights=weights)
         else:
             predicted_amount = np.mean(amounts)
         

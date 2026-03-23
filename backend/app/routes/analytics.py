@@ -381,7 +381,7 @@ def get_ai_aggregation():
 @jwt_required()
 def get_complete_analysis():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         month, year = _period_from_request()
         dashboard = _build_dashboard_payload(user_id, month, year)
         insights = _build_ai_insights_payload(user_id, month, year)
