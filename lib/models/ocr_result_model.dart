@@ -18,9 +18,32 @@ class OCRResult {
   });
 
   factory OCRResult.fromJson(Map<String, dynamic> json) {
+    final rawItems = json['items'];
+    final parsedItems = <String>[];
+
+    if (rawItems is List) {
+      for (final item in rawItems) {
+        if (item is String) {
+          parsedItems.add(item);
+        } else if (item is Map<String, dynamic>) {
+          final name = item['name']?.toString().trim();
+          final price = item['price'];
+          if (name != null && name.isNotEmpty) {
+            if (price is num) {
+              parsedItems.add('$name (${price.toStringAsFixed(2)})');
+            } else {
+              parsedItems.add(name);
+            }
+          }
+        } else if (item != null) {
+          parsedItems.add(item.toString());
+        }
+      }
+    }
+
     return OCRResult(
       store: json['store'] ?? 'Unknown Store',
-      items: json['items'] != null ? List<String>.from(json['items']) : [],
+      items: parsedItems,
       amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
       date: json['date'] ?? DateTime.now().toIso8601String().split('T')[0],
       predictedCategory: json['predicted_category'] ?? 'Other',

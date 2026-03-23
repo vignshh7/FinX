@@ -1,409 +1,422 @@
-import pytesseract
-from PIL import Image, ImageEnhance, ImageFilter
-import cv2
-import numpy as np
-import re
-from datetime import datetime
 import os
+import re
+import tempfile
+from datetime import datetime
+import requests
+from PIL import Image
+
 
 class OCRService:
+    """
+    Strict OCR service that uses OCR.space only.
+    No mock or synthetic fallback data is returned.
+    """
+
     def __init__(self):
-        # Set Tesseract path (update based on installation)
-        tesseract_path = os.getenv('TESSERACT_CMD', 'tesseract')
-        if os.path.exists(tesseract_path):
-            pytesseract.pytesseract.tesseract_cmd = tesseract_path
-    
-    def preprocess_image(self, image_path):
-        """
-        Enhanced preprocessing for better OCR results
-        Multiple preprocessing techniques for receipt images
-        """
+        self.api_key = os.getenv("OCR_SPACE_API_KEY", "K85785367588957")
+        self.api_url = os.getenv("OCR_SPACE_API_URL", "https://api.ocr.space/parse/image")
+        self.timeout_seconds = int(os.getenv("OCR_SPACE_TIMEOUT_SECONDS", "60"))
+        self.max_upload_bytes = 1024 * 1024
+
+    @staticmethod
+    def _safe_float(value):
         try:
-            # Read image with PIL first for better format support
-            pil_image = Image.open(image_path)
-            
-            # Convert to RGB if needed
-            if pil_image.mode != 'RGB':
-                pil_image = pil_image.convert('RGB')
-            
-            # Enhance contrast and sharpness
-            enhancer = ImageEnhance.Contrast(pil_image)
-            pil_image = enhancer.enhance(1.5)
-            
-            enhancer = ImageEnhance.Sharpness(pil_image)
-            pil_image = enhancer.enhance(2.0)
-            
-            # Convert PIL to OpenCV
-            image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-            
-            # Multiple preprocessing approaches
-            processed_images = []
-            
-            # Method 1: Standard grayscale + threshold
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            denoised = cv2.fastNlMeansDenoising(gray, None, 10, 7, 21)
-            
-            # Adaptive threshold
-            thresh1 = cv2.adaptiveThreshold(
-                denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                cv2.THRESH_BINARY, 11, 2
-            )
-            processed_images.append(thresh1)
-            
-            # Method 2: OTSU threshold
-            _, thresh2 = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-            processed_images.append(thresh2)
-            
-            # Method 3: Morphological operations for receipt structure
-            kernel = np.ones((2,2), np.uint8)
-            morphed = cv2.morphologyEx(thresh1, cv2.MORPH_CLOSE, kernel)
-            processed_images.append(morphed)
-            
-            return processed_images
-            
-        except Exception as e:
-            print(f"Error in image preprocessing: {e}")
-            # Fallback to original image
-            image = cv2.imread(image_path)
-            if image is not None:
-                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                return [gray]
-            return [np.zeros((100, 100), dtype=np.uint8)]
-    
-    def extract_text(self, image_path):
-        """
-        Extract text from receipt image with multiple OCR attempts
-        """
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    @staticmethod
+    def _normalize_line(line):
+        return re.sub(r"\s+", " ", (line or "").strip().lower())
+
+    @staticmethod
+    def _amount_from_match(match_value):
+        cleaned = str(match_value).replace(",", "").strip()
         try:
-            processed_images = self.preprocess_image(image_path)
-            best_text = ""
-            best_confidence = 0
-            
-            # OCR configurations for different scenarios
-            ocr_configs = [
-                '--psm 6 --oem 3 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz$.,:/- ',
-                '--psm 4 --oem 3',
-                '--psm 3 --oem 3',
-                '--psm 11 --oem 3',
-                '--psm 13 --oem 3'
-            ]
-            
-            all_texts = []
-            
-            # Try OCR on each processed image with different configs
-            for img in processed_images:
-                for config in ocr_configs:
-                    try:
-                        # Extract text with confidence
-                        data = pytesseract.image_to_data(img, config=config, output_type=pytesseract.Output.DICT)
-                        
-                        # Filter high confidence words
-                        confident_words = []
-                        for i, conf in enumerate(data['conf']):
-                            if int(conf) > 30:  # Confidence threshold
-                                word = data['text'][i].strip()
-                                if word and len(word) > 1:
-                                    confident_words.append(word)
-                        
-                        if confident_words:
-                            text = ' '.join(confident_words)
-                            all_texts.append(text)
-                            
-                            # Calculate average confidence
-                            avg_conf = sum(int(c) for c in data['conf'] if int(c) > 30) / max(1, len([c for c in data['conf'] if int(c) > 30]))
-                            
-                            if avg_conf > best_confidence:
-                                best_confidence = avg_conf
-                                best_text = text
-                                
-                    except Exception as e:
-                        print(f"OCR attempt failed: {e}")
-                        continue
-            
-            # Combine all extracted texts for better parsing
-            combined_text = best_text
-            if len(all_texts) > 1:
-                # Use the longest text as base, supplement with others
-                all_texts.sort(key=len, reverse=True)
-                combined_text = all_texts[0]
-                
-                # Add missing information from other attempts
-                for text in all_texts[1:]:
-                    for word in text.split():
-                        if word not in combined_text and len(word) > 2:
-                            combined_text += " " + word
-            
-            return combined_text if combined_text else "No text detected"
-            
-        except Exception as e:
-            print(f"Error extracting text: {e}")
-            return f"OCR Error: {str(e)}"
-            new_width = int(width * scale)
-            thresh = cv2.resize(thresh, (new_width, 1000), interpolation=cv2.INTER_CUBIC)
-        
-        return thresh
-    
-    def extract_text(self, image_path):
+            return float(cleaned)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _extract_amount_candidates(self, text):
+        lines = [line.strip() for line in text.split("\n") if line.strip()]
+        candidates = []
+        total_keywords = [
+            "grand total",
+            "total due",
+            "amount due",
+            "net payable",
+            "total",
+            "balance due",
+        ]
+        subtotal_keywords = ["subtotal", "sub total"]
+        tax_keywords = ["tax", "gst", "vat", "service tax", "cgst", "sgst", "igst"]
+        payment_keywords = [
+            "cash",
+            "change",
+            "tendered",
+            "visa",
+            "mastercard",
+            "card",
+            "auth",
+            "tip",
+            "paid",
+            "payment",
+        ]
+
+        for idx, raw_line in enumerate(lines):
+            normalized = self._normalize_line(raw_line)
+            amounts = re.findall(r"\$?\s*([0-9][0-9,]*\.[0-9]{2})", raw_line)
+            for match in amounts:
+                value = self._amount_from_match(match)
+                if not (0.01 <= value <= 100000):
+                    continue
+
+                candidate_type = "generic"
+                if any(keyword in normalized for keyword in total_keywords):
+                    candidate_type = "total_line"
+                elif any(keyword in normalized for keyword in subtotal_keywords):
+                    candidate_type = "subtotal_line"
+                elif any(keyword in normalized for keyword in tax_keywords):
+                    candidate_type = "tax_line"
+                elif any(keyword in normalized for keyword in payment_keywords):
+                    candidate_type = "payment_line"
+
+                candidates.append(
+                    {
+                        "value": round(value, 2),
+                        "line": raw_line,
+                        "line_index": idx,
+                        "line_norm": normalized,
+                        "candidate_type": candidate_type,
+                    }
+                )
+
+        return candidates, lines
+
+    def _score_amount_candidate(self, candidate, lines, item_sum, ocr_amount):
+        score = 0.25
+        line_norm = candidate["line_norm"]
+        line_index = candidate["line_index"]
+        value = candidate["value"]
+        total_lines = max(len(lines), 1)
+
+        if candidate["candidate_type"] == "total_line":
+            score += 0.9
+        elif candidate["candidate_type"] == "subtotal_line":
+            score += 0.35
+        elif candidate["candidate_type"] == "tax_line":
+            score += 0.2
+        elif candidate["candidate_type"] == "payment_line":
+            score -= 0.15
+
+        # Totals are usually printed in the lower part of the bill.
+        score += 0.25 * (line_index / total_lines)
+
+        if "grand total" in line_norm or "total due" in line_norm or "amount due" in line_norm:
+            score += 0.35
+
+        if any(token in line_norm for token in ["change", "tendered", "tip"]):
+            score -= 0.3
+
+        if ocr_amount > 0:
+            diff_ratio = abs(value - ocr_amount) / max(value, ocr_amount)
+            if diff_ratio <= 0.03:
+                score += 0.25
+            elif diff_ratio <= 0.12:
+                score += 0.12
+
+        if item_sum > 0:
+            diff_ratio = abs(value - item_sum) / max(value, item_sum)
+            if diff_ratio <= 0.03:
+                score += 0.4
+            elif diff_ratio <= 0.10:
+                score += 0.22
+            elif diff_ratio <= 0.20:
+                score += 0.1
+
+        return round(score, 4)
+
+    def infer_total_amount(self, raw_text, items, ocr_amount):
         """
-        Extract text from receipt using Tesseract OCR
+        Infer a final receipt total using OCR text signals + extracted line items.
+        This combines multiple evidence sources instead of relying on a single field.
         """
-        try:
-            # Preprocess image
-            processed_image = self.preprocess_image(image_path)
-            
-            # Convert numpy array to PIL Image
-            pil_image = Image.fromarray(processed_image)
-            
-            # Perform OCR
-            text = pytesseract.image_to_string(
-                pil_image,
-                config='--psm 6'  # Assume a single uniform block of text
-            )
-            
-            return text
-        except Exception as e:
-            raise Exception(f"OCR extraction failed: {str(e)}")
-    
-    
-    def extract_structured_data(self, text):
-        """
-        Enhanced structured data extraction from OCR text
-        Returns: store, items, amount, date with improved parsing
-        """
-        result = {
-            'store': 'Unknown Store',
-            'items': [],
-            'amount': 0.0,
-            'date': datetime.now().strftime('%Y-%m-%d'),
-            'tax': 0.0,
-            'confidence': 'medium'
+        candidates, lines = self._extract_amount_candidates(raw_text)
+        item_sum = round(
+            sum(
+                self._safe_float(item.get("price"))
+                for item in (items or [])
+                if isinstance(item, dict)
+            ),
+            2,
+        )
+        ocr_amount = round(self._safe_float(ocr_amount), 2)
+
+        predicted = 0.0
+        reason = "No strong amount signals found"
+        confidence = "low"
+
+        best_candidate = None
+        if candidates:
+            for candidate in candidates:
+                candidate["score"] = self._score_amount_candidate(candidate, lines, item_sum, ocr_amount)
+            best_candidate = max(candidates, key=lambda c: c["score"])
+            predicted = round(best_candidate["value"], 2)
+
+            if best_candidate["score"] >= 1.2:
+                confidence = "high"
+            elif best_candidate["score"] >= 0.7:
+                confidence = "medium"
+            else:
+                confidence = "low"
+
+            reason = f"AI scorer selected '{best_candidate['line']}'"
+        elif ocr_amount > 0:
+            predicted = ocr_amount
+            reason = "Used OCR extracted amount"
+            confidence = "medium"
+
+        # If item sum is close to predicted total, blend for stability.
+        if predicted > 0 and item_sum > 0:
+            diff_ratio = abs(predicted - item_sum) / max(predicted, item_sum)
+            if diff_ratio <= 0.25:
+                predicted = round((predicted + item_sum) / 2.0, 2)
+                reason = "Combined total-line amount with itemized sum"
+                confidence = "high"
+
+        # If no usable predicted amount, fall back to itemized sum.
+        if predicted <= 0 and item_sum > 0:
+            predicted = item_sum
+            reason = "Used sum of extracted line items"
+            confidence = "low"
+
+        return {
+            "predicted_amount": predicted,
+            "item_sum": item_sum,
+            "ocr_amount": ocr_amount,
+            "confidence": confidence,
+            "reason": reason,
+            "total_candidates_found": len(candidates),
+            "generic_candidates_found": len([c for c in candidates if c.get("candidate_type") == "generic"]),
+            "selected_amount_line": (best_candidate or {}).get("line", ""),
+            "selected_amount_score": (best_candidate or {}).get("score", 0.0),
         }
-        
-        if not text or text == "No text detected":
-            result['confidence'] = 'low'
-            return result
-        
-        lines = text.split('\n')
-        lines = [line.strip() for line in lines if line.strip() and len(line.strip()) > 1]
-        
-        # Enhanced store name extraction
-        store_patterns = [
-            r'(walmart|target|costco|kroger|safeway|publix|meijer|aldi)',
-            r'([A-Z][A-Za-z\s]{2,20})\s*(store|market|shop|mart)',
-            r'^([A-Z\s]{3,25})$'  # All caps short lines (often store names)
-        ]
-        
-        for line in lines[:5]:  # Check first 5 lines for store name
-            for pattern in store_patterns:
-                match = re.search(pattern, line, re.IGNORECASE)
-                if match:
-                    result['store'] = match.group(1).title()
-                    break
-            if result['store'] != 'Unknown Store':
+
+    def _prepare_image_for_upload(self, image_path):
+        """
+        OCR.space free tier accepts files up to 1MB.
+        Compress and resize oversized images to stay below this hard limit.
+        Returns (path_to_upload, temporary_file_to_cleanup_or_none).
+        """
+        file_size = os.path.getsize(image_path)
+        if file_size <= self.max_upload_bytes:
+            return image_path, None
+
+        with Image.open(image_path) as source:
+            image = source.convert("RGB")
+            width, height = image.size
+
+            # Start with moderate quality and gradually reduce dimensions/quality.
+            quality = 85
+            scale = 1.0
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+            temp_file_path = temp_file.name
+            temp_file.close()
+
+            for _ in range(10):
+                target_width = max(600, int(width * scale))
+                target_height = max(600, int(height * scale))
+                resized = image.resize((target_width, target_height), Image.Resampling.LANCZOS)
+                resized.save(
+                    temp_file_path,
+                    format="JPEG",
+                    quality=quality,
+                    optimize=True,
+                )
+
+                if os.path.getsize(temp_file_path) <= self.max_upload_bytes:
+                    return temp_file_path, temp_file_path
+
+                quality = max(45, quality - 8)
+                scale *= 0.88
+
+        if os.path.getsize(temp_file_path) > self.max_upload_bytes:
+            raise ValueError("Image is too large for OCR.space even after compression")
+
+        return temp_file_path, temp_file_path
+
+    def extract_text(self, image_path):
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"Image not found: {image_path}")
+
+        upload_path, temp_path = self._prepare_image_for_upload(image_path)
+        try:
+            with open(upload_path, "rb") as image_file:
+                files = {
+                    "filename": image_file,
+                }
+                data = {
+                    "apikey": self.api_key,
+                    "language": "eng",
+                    "isOverlayRequired": "false",
+                    "isTable": "true",
+                    "OCREngine": "2",
+                    "scale": "true",
+                }
+                response = requests.post(
+                    self.api_url,
+                    data=data,
+                    files=files,
+                    timeout=self.timeout_seconds,
+                )
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+
+        if response.status_code != 200:
+            raise ValueError(f"OCR.space request failed with status {response.status_code}")
+
+        payload = response.json()
+
+        if payload.get("IsErroredOnProcessing"):
+            messages = payload.get("ErrorMessage") or payload.get("ErrorDetails") or "Unknown OCR API error"
+            if isinstance(messages, list):
+                messages = "; ".join(str(message) for message in messages)
+            raise ValueError(f"OCR.space processing error: {messages}")
+
+        parsed_results = payload.get("ParsedResults") or []
+        text = "\n".join(
+            (entry.get("ParsedText") or "").strip()
+            for entry in parsed_results
+            if isinstance(entry, dict)
+        ).strip()
+
+        if not text or not text.strip():
+            raise ValueError("No text detected from OCR")
+
+        return text
+
+    def extract_structured_data(self, text):
+        result = {
+            "store": "Unknown Store",
+            "items": [],
+            "amount": 0.0,
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "tax": 0.0,
+            "confidence": "medium",
+        }
+
+        lines = [line.strip() for line in text.split("\n") if line.strip()]
+        if not lines:
+            raise ValueError("OCR produced empty parsed lines")
+
+        # Store name is usually near the top of the receipt.
+        for line in lines[:5]:
+            cleaned = re.sub(r"[^A-Za-z0-9\s&'-]", "", line).strip()
+            if len(cleaned) >= 3:
+                result["store"] = cleaned.title()
                 break
-        
-        # Enhanced amount extraction with multiple patterns
+
         amount_patterns = [
-            r'total[:\s]*\$?([0-9]+\.?[0-9]*)',
-            r'amount[:\s]*\$?([0-9]+\.?[0-9]*)',
-            r'subtotal[:\s]*\$?([0-9]+\.?[0-9]*)',
-            r'\$([0-9]+\.[0-9]{2})',  # Standard currency format
-            r'([0-9]+\.[0-9]{2})',    # Decimal amounts
+            r"total[:\s]*\$?([0-9]+\.?[0-9]*)",
+            r"amount[:\s]*\$?([0-9]+\.?[0-9]*)",
+            r"\$([0-9]+\.[0-9]{2})",
         ]
-        
+
         amounts_found = []
         for line in lines:
             for pattern in amount_patterns:
-                matches = re.findall(pattern, line, re.IGNORECASE)
-                for match in matches:
+                for match in re.findall(pattern, line, flags=re.IGNORECASE):
                     try:
-                        amount = float(match)
-                        if 0.01 <= amount <= 10000:  # Reasonable range
-                            amounts_found.append(amount)
+                        value = float(match)
+                        if 0.01 <= value <= 100000:
+                            amounts_found.append(value)
                     except ValueError:
                         continue
-        
-        # Use the largest reasonable amount as total
+
         if amounts_found:
-            result['amount'] = max(amounts_found)
-            result['confidence'] = 'high' if len(amounts_found) >= 2 else 'medium'
-        
-        # Enhanced date extraction
+            result["amount"] = max(amounts_found)
+
         date_patterns = [
-            r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',
-            r'(\d{2,4}[/-]\d{1,2}[/-]\d{1,2})',
-            r'(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s*\d{1,2},?\s*\d{2,4}',
+            r"(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+            r"(\d{4}[/-]\d{1,2}[/-]\d{1,2})",
         ]
-        
         for line in lines:
+            matched_date = None
             for pattern in date_patterns:
-                match = re.search(pattern, line, re.IGNORECASE)
-                if match:
-                    try:
-                        date_str = match.group(1)
-                        # Try to parse various date formats
-                        for fmt in ['%m/%d/%Y', '%m-%d-%Y', '%Y/%m/%d', '%Y-%m-%d', '%m/%d/%y', '%m-%d-%y']:
-                            try:
-                                parsed_date = datetime.strptime(date_str, fmt)
-                                result['date'] = parsed_date.strftime('%Y-%m-%d')
-                                break
-                            except ValueError:
-                                continue
-                        break
-                    except:
-                        continue
-            if result['date'] != datetime.now().strftime('%Y-%m-%d'):
+                m = re.search(pattern, line)
+                if m:
+                    matched_date = m.group(1)
+                    break
+            if not matched_date:
+                continue
+
+            for fmt in ["%m/%d/%Y", "%m-%d-%Y", "%m/%d/%y", "%Y-%m-%d", "%Y/%m/%d"]:
+                try:
+                    result["date"] = datetime.strptime(matched_date, fmt).strftime("%Y-%m-%d")
+                    break
+                except ValueError:
+                    continue
+            if result["date"] != datetime.now().strftime("%Y-%m-%d"):
                 break
-        
-        # Enhanced item extraction
-        item_patterns = [
-            r'([A-Za-z\s]{3,30})\s+([0-9]+\.?[0-9]*)',  # Item name + price
-            r'^([A-Z\s]{3,20})\s*$',  # All caps lines (potential items)
-            r'(\w+\s+\w+)\s+\$?([0-9]+\.[0-9]{2})',    # Two words + price
-        ]
-        
+
+        item_pattern = re.compile(r"^([A-Za-z][A-Za-z0-9\s&'\-]{2,40})\s+\$?([0-9]+\.[0-9]{2})$")
         for line in lines:
-            # Skip lines that look like headers or totals
-            if any(word in line.lower() for word in ['total', 'subtotal', 'tax', 'change', 'credit', 'cash', 'thank you']):
+            if any(token in line.lower() for token in ["total", "subtotal", "tax", "change", "cash", "visa", "mastercard"]):
                 continue
-                
-            for pattern in item_patterns:
-                match = re.search(pattern, line)
-                if match:
-                    item_name = match.group(1).strip()
-                    if len(item_name) >= 3 and not re.match(r'^\d+$', item_name):
-                        price = 0.0
-                        if len(match.groups()) > 1:
-                            try:
-                                price = float(match.group(2))
-                            except:
-                                price = 0.0
-                        result['items'].append({
-                            'name': item_name.title(),
-                            'price': price
-                        })
-                        break
-        
-        # Remove duplicate items
-        seen_items = set()
-        unique_items = []
-        for item in result['items']:
-            if item['name'] not in seen_items:
-                seen_items.add(item['name'])
-                unique_items.append(item)
-        
-        result['items'] = unique_items[:10]  # Limit to 10 items
-        
-        # Adjust confidence based on extracted data quality
-        confidence_score = 0
-        if result['store'] != 'Unknown Store':
-            confidence_score += 25
-        if result['amount'] > 0:
-            confidence_score += 30
-        if result['items']:
-            confidence_score += 25
-        if result['date'] != datetime.now().strftime('%Y-%m-%d'):
-            confidence_score += 20
-        
-        if confidence_score >= 70:
-            result['confidence'] = 'high'
-        elif confidence_score >= 40:
-            result['confidence'] = 'medium'
+            m = item_pattern.search(line)
+            if not m:
+                continue
+            try:
+                result["items"].append(
+                    {
+                        "name": m.group(1).strip().title(),
+                        "price": float(m.group(2)),
+                    }
+                )
+            except ValueError:
+                continue
+
+        score = 0
+        if result["store"] != "Unknown Store":
+            score += 25
+        if result["amount"] > 0:
+            score += 35
+        if result["items"]:
+            score += 20
+        if result["date"] != datetime.now().strftime("%Y-%m-%d"):
+            score += 20
+
+        if score >= 70:
+            result["confidence"] = "high"
+        elif score >= 40:
+            result["confidence"] = "medium"
         else:
-            result['confidence'] = 'low'
-        
+            result["confidence"] = "low"
+
         return result
-        
-        # Extract store name (usually first non-empty line)
-        if lines:
-            result['store'] = lines[0][:100]  # Limit to 100 chars
-        
-        # Extract amount (look for currency patterns)
-        amount_patterns = [
-            r'\$?\s*(\d+[,.]?\d*\.?\d+)',  # $123.45 or 123.45
-            r'total[:\s]*\$?\s*(\d+[,.]?\d*\.?\d+)',  # Total: 123.45
-            r'amount[:\s]*\$?\s*(\d+[,.]?\d*\.?\d+)',  # Amount: 123.45
-        ]
-        
-        for line in lines:
-            line_lower = line.lower()
-            for pattern in amount_patterns:
-                match = re.search(pattern, line_lower)
-                if match:
-                    amount_str = match.group(1).replace(',', '')
-                    try:
-                        amount = float(amount_str)
-                        if amount > result['amount']:  # Take the largest amount
-                            result['amount'] = amount
-                    except ValueError:
-                        pass
-        
-        # Extract date
-        date_patterns = [
-            r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',  # MM/DD/YYYY or DD-MM-YYYY
-            r'(\d{4}[/-]\d{1,2}[/-]\d{1,2})',    # YYYY-MM-DD
-        ]
-        
-        for line in lines:
-            for pattern in date_patterns:
-                match = re.search(pattern, line)
-                if match:
-                    date_str = match.group(1)
-                    try:
-                        # Try different date formats
-                        for fmt in ['%m/%d/%Y', '%d-%m-%Y', '%Y-%m-%d', '%m/%d/%y']:
-                            try:
-                                parsed_date = datetime.strptime(date_str, fmt)
-                                result['date'] = parsed_date.strftime('%Y-%m-%d')
-                                break
-                            except ValueError:
-                                continue
-                    except Exception:
-                        pass
-        
-        # Extract items (look for item-like patterns)
-        # This is a simple heuristic - could be improved
-        item_keywords = ['milk', 'bread', 'eggs', 'coffee', 'tea', 'juice', 'water']
-        for line in lines:
-            line_lower = line.lower()
-            # Skip lines with amounts or dates
-            if re.search(r'\$|\d+\.\d{2}', line) or re.search(r'\d{1,2}[/-]\d{1,2}', line):
-                continue
-            # Check if line contains common item keywords or looks like an item
-            if any(keyword in line_lower for keyword in item_keywords) or (len(line.split()) <= 4 and len(line) > 3):
-                if line not in [result['store']] and len(result['items']) < 10:
-                    result['items'].append(line)
-        
-        return result
-    
+
     def process_receipt(self, image_path):
-        """
-        Enhanced OCR pipeline: preprocess -> extract -> structure
-        """
-        try:
-            print(f"Processing receipt: {image_path}")
-            
-            # Extract text with improved OCR
-            raw_text = self.extract_text(image_path)
-            print(f"Extracted text: {raw_text[:200]}...")  # First 200 chars for debug
-            
-            # Extract structured data with enhanced parsing
-            structured_data = self.extract_structured_data(raw_text)
-            
-            # Add processing metadata
-            structured_data['raw_text'] = raw_text
-            structured_data['processing_status'] = 'success'
-            
-            return structured_data
-            
-        except Exception as e:
-            print(f"Error processing receipt: {e}")
-            return {
-                'store': 'Processing Error',
-                'items': [],
-                'amount': 0.0,
-                'date': datetime.now().strftime('%Y-%m-%d'),
-                'raw_text': f"Error: {str(e)}",
-                'processing_status': 'error',
-                'confidence': 'low'
-            }
+        raw_text = self.extract_text(image_path)
+        structured_data = self.extract_structured_data(raw_text)
+
+        amount_analysis = self.infer_total_amount(
+            raw_text=raw_text,
+            items=structured_data.get("items", []),
+            ocr_amount=structured_data.get("amount", 0.0),
+        )
+
+        structured_data["ocr_amount"] = amount_analysis["ocr_amount"]
+        structured_data["ai_predicted_amount"] = amount_analysis["predicted_amount"]
+        structured_data["amount_confidence"] = amount_analysis["confidence"]
+        structured_data["amount_reason"] = amount_analysis["reason"]
+        structured_data["selected_amount_line"] = amount_analysis.get("selected_amount_line", "")
+        structured_data["selected_amount_score"] = amount_analysis.get("selected_amount_score", 0.0)
+        structured_data["amount"] = amount_analysis["predicted_amount"] or structured_data.get("amount", 0.0)
+
+        structured_data["raw_text"] = raw_text
+        structured_data["processing_status"] = "success"
+        return structured_data

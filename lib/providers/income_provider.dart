@@ -7,10 +7,20 @@ class IncomeProvider with ChangeNotifier {
   List<Income> _incomes = [];
   bool _isLoading = false;
   String? _error;
+  
+  // Cache timestamp for smart API calls
+  DateTime? _lastFetch;
+  static const Duration _cacheDuration = Duration(minutes: 5);
 
   List<Income> get incomes => _incomes;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  
+  // Check if cache is still valid
+  bool _isCacheValid() {
+    if (_lastFetch == null) return false;
+    return DateTime.now().difference(_lastFetch!) < _cacheDuration;
+  }
   
   // Calculate total income
   double get total {
@@ -40,7 +50,15 @@ class IncomeProvider with ChangeNotifier {
     return totals;
   }
 
-  Future<void> fetchIncomes() async {
+  Future<void> fetchIncomes({bool forceRefresh = false}) async {
+    // Skip if cache is valid and no force refresh
+    if (!forceRefresh && _isCacheValid()) {
+      if (kDebugMode) {
+        print('Using cached incomes data');
+      }
+      return;
+    }
+    
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -50,10 +68,17 @@ class IncomeProvider with ChangeNotifier {
       _incomes = (response['incomes'] as List)
           .map((json) => Income.fromJson(json))
           .toList();
+      _lastFetch = DateTime.now();
       _error = null;
+      if (kDebugMode) {
+        print('Incomes fetched: ${_incomes.length} items');
+      }
     } catch (e) {
       _error = e.toString();
       _incomes = [];
+      if (kDebugMode) {
+        print('Error fetching incomes: $_error');
+      }
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -65,7 +90,30 @@ class IncomeProvider with ChangeNotifier {
       final response = await _apiService.addIncome(income.toJson());
       final newIncome = Income.fromJson(response);
       _incomes.insert(0, newIncome);
+      _lastFetch = null; // Invalidate cache
       notifyListeners();
+      if (kDebugMode) {
+        print('Income added successfully, cache invalidated');
+      }
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    }
+  }
+
+  Future<void> updateIncome(Income income) async {
+    try {
+      final response = await _apiService.updateIncome(income.id, income.toJson());
+      final updatedIncome = Income.fromJson(response);
+      final index = _incomes.indexWhere((i) => i.id == income.id);
+      if (index != -1) {
+        _incomes[index] = updatedIncome;
+        _lastFetch = null; // Invalidate cache
+        notifyListeners();
+        if (kDebugMode) {
+          print('Income updated successfully, cache invalidated');
+        }
+      }
     } catch (e) {
       _error = e.toString();
       rethrow;
@@ -76,10 +124,25 @@ class IncomeProvider with ChangeNotifier {
     try {
       await _apiService.deleteIncome(id);
       _incomes.removeWhere((income) => income.id == id);
+      _lastFetch = null; // Invalidate cache
       notifyListeners();
+      if (kDebugMode) {
+        print('Income deleted successfully, cache invalidated');
+      }
     } catch (e) {
       _error = e.toString();
       rethrow;
+    }
+  }
+  
+  // Clear all cached data (call on logout)
+  void clearCache() {
+    _incomes = [];
+    _lastFetch = null;
+    _error = null;
+    notifyListeners();
+    if (kDebugMode) {
+      print('IncomeProvider cache cleared');
     }
   }
 }

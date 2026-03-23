@@ -12,6 +12,7 @@ import '../core/widgets/premium_dialogs.dart';
 import '../providers/expense_provider.dart';
 import '../models/expense_model.dart';
 import '../models/category_model.dart';
+import 'home/home_screen.dart';
 
 /// Premium OCR Result Screen with editable fields, confidence indicators, and AI explanations
 class OCRResultScreenPremium extends StatefulWidget {
@@ -115,8 +116,11 @@ class _OCRResultScreenPremiumState extends State<OCRResultScreenPremium>
       HapticFeedback.heavyImpact();
       PremiumSnackBar.showSuccess(context, 'Expense saved successfully!');
       
-      // Navigate back to home
-      Navigator.popUntil(context, (route) => route.isFirst);
+      // Navigate to home screen and clear all previous routes
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (route) => false,
+      );
     } else {
       PremiumSnackBar.showError(context, 'Failed to save expense');
     }

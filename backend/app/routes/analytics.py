@@ -351,11 +351,42 @@ def get_ai_advice():
         user_id = int(get_jwt_identity())
         month, year = _period_from_request()
         payload = _build_ai_insights_payload(user_id, month, year)
+        raw_recommendations = payload['budget_recommendations']
+
+        # Keep original keys (reason/suggestion) and add normalized keys
+        # (message/recommendation/type/priority/title) for older/newer UIs.
+        recommendations = []
+        for idx, item in enumerate(raw_recommendations):
+            if isinstance(item, dict):
+                reason = item.get('reason', '')
+                suggestion = item.get('suggestion', '')
+                recommendations.append(
+                    {
+                        **item,
+                        'title': item.get('title') or 'Financial Tip',
+                        'message': item.get('message') or reason,
+                        'recommendation': item.get('recommendation') or suggestion,
+                        'type': item.get('type') or 'suggestion',
+                        'priority': item.get('priority') or ('high' if idx == 0 else 'medium'),
+                    }
+                )
+            else:
+                text = str(item)
+                recommendations.append(
+                    {
+                        'title': 'Financial Tip',
+                        'message': text,
+                        'recommendation': text,
+                        'type': 'suggestion',
+                        'priority': 'medium',
+                    }
+                )
+
         return (
             jsonify(
                 {
                     'period': payload['period'],
-                    'recommendations': payload['budget_recommendations'],
+                    'recommendations': recommendations,
                     'summary': payload['explainability'],
                 }
             ),
@@ -372,7 +403,26 @@ def get_ai_aggregation():
         user_id = int(get_jwt_identity())
         months = request.args.get('months', type=int) or 6
         trend = _build_monthly_trend(user_id, months, datetime.now())
-        return jsonify({'months': months, 'trend': trend}), 200
+
+        monthly_totals = {
+            item['month']: float(item.get('total', 0.0) or 0.0)
+            for item in trend
+        }
+        overall_total = sum(monthly_totals.values())
+
+        return (
+            jsonify(
+                {
+                    'months': months,
+                    'trend': trend,
+                    'monthly_totals': monthly_totals,
+                    'overall_total': overall_total,
+                    'months_analyzed': len(monthly_totals),
+                    'average_monthly': (overall_total / len(monthly_totals)) if monthly_totals else 0.0,
+                }
+            ),
+            200,
+        )
     except Exception as e:
         return jsonify({'message': f'Failed to load aggregation: {str(e)}'}), 500
 
